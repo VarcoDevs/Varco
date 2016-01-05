@@ -2,18 +2,22 @@
 #define VARCO_MAINWINDOW_HPP
 
 #ifdef WIN32
-#include "windows.h"
+  #include <WindowHandling/BaseOSWindow_Win.hpp>
 #endif
+
+#include "SkCanvas.h"
 
 namespace varco {
 
-  class MainWindow {
+  class MainWindow : public BaseOSWindow {
   public:
 
 #ifdef WIN32
-    static int create (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, 
-                       int nCmdShow);
+    MainWindow(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, 
+               int nCmdShow);
 #endif
+
+    void draw(SkCanvas *canvas) override;
   };
 
 }
