@@ -9,6 +9,7 @@ set (LIBS)
 find_package (OpenGL REQUIRED)
 list (APPEND LIBS ${OPENGL_LIBRARIES})
 
+########################################### Skia dependency ########################################### 
 list (APPEND INCLUDES 
                         deps/skia/include/android
                         deps/skia/include/animator
@@ -28,8 +29,10 @@ list (APPEND INCLUDES
                         deps/skia/include/utils
                         deps/skia/include/views
                         deps/skia/include/xml)
-                        
-# ---------------- Platform specific code ------------------- #
+
+# 7zip is preferable
+set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 if (WIN32)
     set (WINDOWHANDLING_SRCS 
             src/WindowHandling/BaseOSWindow_Win.cpp
@@ -39,8 +42,26 @@ if (WIN32)
     list (APPEND LIBS
             optimized;${CMAKE_SOURCE_DIR}/deps/skia/lib/win64/skia.lib;
             debug;${CMAKE_SOURCE_DIR}/deps/skia/lib/win64/skiad.lib;)
+    
+    # Decompress binaries if needed    
+    if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/lib/win64/skia.lib)
+      message (STATUS "Decompressing Win64 Skia binaries...")
+      # 7zip is preferable, but as a fallback use cmake built-in 7zip module
+      find_package (SevenZip)
+      if (NOT SEVENZIP_FOUND)
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_SOURCE_DIR}/deps/skia/lib/win64/libs.7z
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps/skia/lib/win64 # Folder where to decompress stuff
+        )
+      else() # Use 7Zip
+        execute_process(
+            COMMAND ${SEVENZIP_BINARY} x ${CMAKE_SOURCE_DIR}/deps/skia/lib/win64/libs.7z
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps/skia/lib/win64 # Folder where to decompress stuff
+        )
+      endif()
+    endif()    
 endif()
-# ----------------------------------------------------------- #
+########################################### Skia dependency ########################################### 
 
 list (APPEND SRCS ${WINDOWHANDLING_SRCS})
 source_group (WindowHandling FILES ${WINDOWHANDLING_SRCS})

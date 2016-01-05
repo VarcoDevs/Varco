@@ -106,75 +106,60 @@ namespace varco {
 
   LRESULT BaseOSWindow::wndProcInternal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
-    case WM_CLOSE: {
-      DestroyWindow(hWnd);
-    } break;
-    case WM_DESTROY: {
-      PostQuitMessage(0);
-    } break;
-    case WM_ERASEBKGND: {
-      return 1; // Do not draw the background
-    } break;
-    case WM_CREATE: {
-    //  RECT rcClient;
-   //   GetWindowRect(hWnd, &rcClient);
 
-      // Inform the application of the frame change - triggers a WM_NCCALCSIZE
-      // and removes the window title and icon
-     /* SetWindowPos(hWnd, NULL, rcClient.left, rcClient.top,
-        rcClient.right - rcClient.left, rcClient.bottom - rcClient.top,
-        SWP_FRAMECHANGED);*/
+      case WM_CLOSE: {
+        DestroyWindow(hWnd);
+      } break;
 
-      SetCursor(LoadCursor(NULL, IDC_ARROW));
+      case WM_DESTROY: {
+        PostQuitMessage(0);
+      } break;
 
-     // SetWindowLong(hWnd, GWL_EXSTYLE, WS_EX_LAYERED);
-      // Choose a colour that you will not use in the program, eg RGB(200,201,202)
+      case WM_ERASEBKGND: {
+        return 1; // Do not draw the background
+      } break;
 
-     // SetLayeredWindowAttributes(hWnd, TRANSPARENCY_COLOR_GDI, 0, LWA_COLORKEY);
-
-    } break;
-
-    case WM_MOUSEMOVE: {
+      case WM_MOUSEMOVE: {
       
-    } break;
+      } break;
 
-    case WM_SIZE: {
-      INT width = LOWORD(lParam);
-      INT height = HIWORD(lParam);
-      this->resize(width, height);
+      case WM_SIZE: {
+        INT width = LOWORD(lParam);
+        INT height = HIWORD(lParam);
+        this->resize(width, height);
 
-      InvalidateRect(hWnd, NULL, 0);
-    } break;
+        InvalidateRect(hWnd, NULL, 0);
+      } break;
 
-    case WM_PAINT: {
+      case WM_PAINT: {
 
-      if (!(Width > 0 && Height > 0))
-        return 1; // Nonsense painting a 0 area
+        if (!(Width > 0 && Height > 0))
+          return 1; // Nonsense painting a 0 area
 
-      PAINTSTRUCT ps;
-      HDC hdc = BeginPaint(hWnd, &ps);
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
 
-      // Call the derived update function
-      SkAutoTUnref<SkSurface> surface(this->createSurface());
-      SkCanvas* canvas = surface->getCanvas();
-      this->draw(canvas);
+        // Call the derived update function
+        SkAutoTUnref<SkSurface> surface(this->createSurface());
+        SkCanvas* canvas = surface->getCanvas();
+        this->draw(canvas);
 
-      // Finally do the painting after the drawing is done
-      this->paint(hdc, false);
+        // Finally do the painting after the drawing is done
+        this->paint(hdc, false);
 
-      EndPaint(hWnd, &ps);
-      return 1; // Completely handled
-    } break;
+        EndPaint(hWnd, &ps);
+        return 1; // Completely handled
+      } break;
 
     }
     return DefWindowProc(hWnd, message, wParam, lParam);
   }
 
+  // BitBlt the rendered window into the device context
   void BaseOSWindow::paint(HDC hdc, bool aero) {
 
     HDC hdcMem = CreateCompatibleDC(hdc);
     
-
     BITMAPINFO BMI;
     memset(&BMI, 0, sizeof(BMI));
     BMI.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -193,7 +178,9 @@ namespace varco {
     SetDIBits(hdcMem, bmp, 0, Bitmap.height(),
       Bitmap.getPixels(),
       &BMI, DIB_RGB_COLORS);
-    /*SetDIBitsToDevice(hdcMem,
+
+    /* // Directly set pixels in the device context
+    SetDIBitsToDevice(hdcMem,
       0, 0,
       Bitmap.width(), Bitmap.height(),
       0, 0,
@@ -203,17 +190,9 @@ namespace varco {
       DIB_RGB_COLORS);*/
     Bitmap.unlockPixels();
 
-    //BITMAP bm;
-    //GetObject(bmp, sizeof(bm), &bm);
-
-
     HBITMAP oldBmp = (HBITMAP)SelectObject(hdcMem, bmp);
 
- // if(aero)
-      BitBlt(hdc, 0, 0, Bitmap.width(), Bitmap.height(), hdcMem, 0, 0, SRCCOPY);
- // else
-  // TransparentBlt(hdc, 0, 0, Bitmap.width(), Bitmap.height(), hdcMem, 0, 0, Bitmap.width(), Bitmap.height(), RGB(181, 230, 29));
-
+    BitBlt(hdc, 0, 0, Bitmap.width(), Bitmap.height(), hdcMem, 0, 0, SRCCOPY);
 
     SelectObject(hdcMem, oldBmp);
 

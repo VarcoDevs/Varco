@@ -50,14 +50,5 @@ namespace varco {
       paint.setShader(NULL);
     }
 
-    // Draw a message with a nice black paint.
-    paint.setFlags(
-      SkPaint::kAntiAlias_Flag |
-      SkPaint::kSubpixelText_Flag |  // ... avoid waggly text when rotating.
-      SkPaint::kUnderlineText_Flag);
-    paint.setColor(SK_ColorBLACK);
-    paint.setTextSize(20);
-
-
   }
 } // namespace varco
