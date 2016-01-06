@@ -15,6 +15,7 @@
 
 # Libraries (these aren't checked in uncompressed)
 *.lib
+*.a
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

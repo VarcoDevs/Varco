@@ -118,18 +118,32 @@ namespace varco {
   bool BaseOSWindow::wndProc(XEvent *evt) {
 
     switch (evt->type) {
+
       case Expose: {
-        // TODO PAINT
+
+        if (!(Width > 0 && Height > 0))
+          return 1; // Nonsense painting a 0 area
+
+        // Call the derived update function
+        SkAutoTUnref<SkSurface> surface(this->createSurface());
+        SkCanvas* canvas = surface->getCanvas();
+        this->draw(canvas);
+
+        // Finally do the painting after the drawing is done
+        this->paint();
+
       } break;
+
       case ConfigureNotify: {
         this->resize(evt->xconfigure.width, evt->xconfigure.height);
       } break;
+
       case ClientMessage: {
         if ((Atom)evt->xclient.data.l[0] == wm_delete_window_message)
           return false;
       } break;
-        // fallthrough
-      default:
+
+      default: // fallthrough
         break;
       }
     return true; // Handled
@@ -154,6 +168,47 @@ namespace varco {
       if(ret == false) // Exit requested
         break;
     }
+  }
+
+  void BaseOSWindow::paint() {
+    if (fDisplay == nullptr)
+      return; // No X display
+
+    // Draw the bitmap to the screen.
+    int width = Bitmap.width();
+    int height = Bitmap.height();
+
+    // Convert the bitmap to XImage
+    XImage image;
+    sk_bzero(&image, sizeof(image));
+
+    int bitsPerPixel = Bitmap.bytesPerPixel() * 8;
+    image.width = Bitmap.width();
+    image.height = Bitmap.height();
+    image.format = ZPixmap;
+    image.data = (char*) Bitmap.getPixels();
+    image.byte_order = LSBFirst;
+    image.bitmap_unit = bitsPerPixel;
+    image.bitmap_bit_order = LSBFirst;
+    image.bitmap_pad = bitsPerPixel;
+    image.depth = 24;
+    image.bytes_per_line = Bitmap.rowBytes() - Bitmap.width() * 4;
+    image.bits_per_pixel = bitsPerPixel;
+
+    auto res = XInitImage(&image);
+    if(res == false)
+      return;
+
+    XPutImage(fDisplay, fWin, fGc, &image,
+              0, 0,     // src x,y
+              0, 0,     // dst x,y
+              width, height);
+  }
+
+  // Create a surface from the bitmap info (the canvas will draw in here)
+  SkSurface* BaseOSWindow::createSurface() {
+    const SkSurfaceProps fSurfaceProps = SkSurfaceProps::kLegacyFontHost_InitType;
+    return SkSurface::NewRasterDirect(Bitmap.info(), Bitmap.getPixels(), Bitmap.rowBytes(), &fSurfaceProps);
   }
 
 } // namespace varco

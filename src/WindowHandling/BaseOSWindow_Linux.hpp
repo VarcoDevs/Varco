@@ -33,7 +33,9 @@ namespace varco {
 
     void mapWindowAndWait();
     bool wndProc(XEvent *evt); // Returns false to exit the loop
+    SkSurface* createSurface();
     void resize(int width, int height);
+    void paint();
   };
 
 }
