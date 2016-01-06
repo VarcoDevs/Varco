@@ -6,10 +6,13 @@
 
 namespace varco {
 
-#ifdef WIN32
+#ifdef _WIN32
   MainWindow::MainWindow(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
                          LPSTR lpCmdLine, int nCmdShow)
     : BaseOSWindow(hInstance, hPrevInstance, lpCmdLine, nCmdShow)
+#elif defined __linux__
+  MainWindow::MainWindow(int argc, char **argv)
+    : BaseOSWindow(argc, argv)
 #endif
   {}
 

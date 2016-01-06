@@ -7,6 +7,12 @@
 *.userosscache
 *.sln.docstates
 
+# Qt Creator stuf
+*.includes
+*.files
+*.creator
+*.config
+
 # Libraries (these aren't checked in uncompressed)
 *.lib
 
