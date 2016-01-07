@@ -82,37 +82,6 @@ namespace varco {
     }
   }
 
-  static SkMSec gTimerDelay;
-
-  static bool MyXNextEventWithDelay(Display* dsp, XEvent* evt) {
-    // Check for pending events before entering the select loop. There might
-    // be events in the in-memory queue but not processed yet.
-    if (XPending(dsp)) {
-        XNextEvent(dsp, evt);
-        return true;
-      }
-
-    SkMSec ms = gTimerDelay;
-    if (ms > 0) {
-        int x11_fd = ConnectionNumber(dsp);
-        fd_set input_fds;
-        FD_ZERO(&input_fds);
-        FD_SET(x11_fd, &input_fds);
-
-        timeval tv;
-        tv.tv_sec = ms / 1000;              // seconds
-        tv.tv_usec = (ms % 1000) * 1000;    // microseconds
-
-        if (!select(x11_fd + 1, &input_fds, nullptr, nullptr, &tv)) {
-            if (!XPending(dsp)) {
-                return false;
-              }
-          }
-      }
-    XNextEvent(dsp, evt);
-    return true;
-  }
-
   static Atom wm_delete_window_message;
 
   bool BaseOSWindow::wndProc(XEvent *evt) {
