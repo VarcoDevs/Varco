@@ -105,6 +105,13 @@ namespace varco {
 
       case ConfigureNotify: {
         this->resize(evt->xconfigure.width, evt->xconfigure.height);
+
+        // Fire a redraw() event
+        XEvent exppp;
+        memset(&exppp, 0, sizeof(exppp));
+        exppp.type = Expose;
+        exppp.xexpose.window = fWin;
+        XSendEvent(fDisplay, fWin, False, ExposureMask, &exppp);
       } break;
 
       case ClientMessage: {

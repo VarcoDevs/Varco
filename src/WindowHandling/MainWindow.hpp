@@ -6,7 +6,7 @@
 #elif defined __linux__
   #include <WindowHandling/BaseOSWindow_Linux.hpp>
 #endif
-
+#include <UI/TabCtrl.hpp>
 #include "SkCanvas.h"
 
 namespace varco {
@@ -22,6 +22,9 @@ namespace varco {
 #endif
 
     void draw(SkCanvas *canvas) override;
+
+  private:
+    TabCtrl tabCtrl;
   };
 
 }

@@ -106,6 +106,12 @@ endif()
 list (APPEND SRCS ${WINDOWHANDLING_SRCS})
 source_group (WindowHandling FILES ${WINDOWHANDLING_SRCS})
 
+set (UI_SRCS
+            src/UI/TabCtrl.cpp
+            src/UI/TabCtrl.hpp)
+list (APPEND SRCS ${UI_SRCS})
+source_group (UI FILES ${UI_SRCS})
+
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})
 target_link_libraries (varco ${LIBS})

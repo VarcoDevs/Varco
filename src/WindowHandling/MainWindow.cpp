@@ -21,37 +21,35 @@ namespace varco {
     // Clear background color
     canvas->drawColor(SK_ColorWHITE);
 
-    SkPaint paint;
-    paint.setColor(SK_ColorRED);
+    // Calculate TabCtrl region
+    SkRect tabCtrlRect = SkRect::MakeLTRB(0, 0, this->Width, 30);
+    // Draw the TabCtrl region if needed
+    tabCtrl.setRect(tabCtrlRect);
+    tabCtrl.paint(canvas);
 
-    // Draw a rectangle with red paint
-    SkRect rect = {
-      10, 10,
-      128, 128
-    };
-    canvas->drawRect(rect, paint);
 
-    // Set up a linear gradient and draw a circle
-    {
-      SkPoint linearPoints[] = {
-        { 0, 0 },
-        { 300, 300 }
-      };
-      SkColor linearColors[] = { SK_ColorGREEN, SK_ColorBLACK };
 
-      SkShader* shader = SkGradientShader::CreateLinear(
-        linearPoints, linearColors, NULL, 2,
-        SkShader::kMirror_TileMode);
-      SkAutoUnref shader_deleter(shader);
+//    // Set up a linear gradient and draw a circle
+//    {
+//      SkPoint linearPoints[] = {
+//        { 0, 0 },
+//        { 300, 300 }
+//      };
+//      SkColor linearColors[] = { SK_ColorGREEN, SK_ColorBLACK };
 
-      paint.setShader(shader);
-      paint.setFlags(SkPaint::kAntiAlias_Flag);
+//      SkShader* shader = SkGradientShader::CreateLinear(
+//        linearPoints, linearColors, NULL, 2,
+//        SkShader::kMirror_TileMode);
+//      SkAutoUnref shader_deleter(shader);
 
-      canvas->drawCircle(200, 200, 64, paint);
+//      paint.setShader(shader);
+//      paint.setFlags(SkPaint::kAntiAlias_Flag);
 
-      // Detach shader
-      paint.setShader(NULL);
-    }
+//      canvas->drawCircle(200, 200, 64, paint);
+
+//      // Detach shader
+//      paint.setShader(NULL);
+//    }
 
   }
 } // namespace varco
