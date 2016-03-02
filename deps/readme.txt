@@ -41,3 +41,16 @@ as a fallback
 
 Decompression:
 $ 7z x libs.7z
+
+Updating dependencies
+=====================
+
+Dependencies are in the form of static binaries and can pester git's history. In order to
+update them and remove them from the history (so that only the last one is kept) one could
+run the command
+
+    git filter-branch --force --index-filter \
+    'git rm --cached --ignore-unmatch deps/skia/libs/linux/libs.7z' \
+    --prune-empty --tag-name-filter cat -- --all
+
+WARNING: this will also destroy the local copy.
