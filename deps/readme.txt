@@ -53,4 +53,11 @@ run the command
     'git rm --cached --ignore-unmatch deps/skia/libs/linux/libs.7z' \
     --prune-empty --tag-name-filter cat -- --all
 
-WARNING: this will also destroy the local copy.
+WARNING: this will also destroy the local copy. After modifications have been done, force push
+the changes to github
+
+    git push origin --force --all
+
+Collaborators will need to rebase (not merge) if they created branches off the old (tained) repo.
+
+More info on: https://help.github.com/articles/remove-sensitive-data/
