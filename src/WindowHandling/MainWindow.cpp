@@ -22,7 +22,7 @@ namespace varco {
     canvas->drawColor(SK_ColorWHITE);
 
     // Calculate TabCtrl region
-    SkRect tabCtrlRect = SkRect::MakeLTRB(0, 0, this->Width, 30);
+    SkRect tabCtrlRect = SkRect::MakeLTRB(0, 0, (SkScalar)this->Width, 30);
     // Draw the TabCtrl region if needed
     tabCtrl.setRect(tabCtrlRect);
     tabCtrl.paint(canvas);

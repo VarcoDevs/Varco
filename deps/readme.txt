@@ -4,7 +4,7 @@ Compiling Skia with CMake
 Skia is precompiled (usually via CMake) in both debug and release static libraries.
 In order to compile Skia some "adjustments" have to take place:
 
-1) In skia/cmake/SkUserConfig.h.in it might be necessary for linux systems to define
+1) In skia/cmake/SkUserConfig.h.in it is necessary for linux systems to define
 
     #define SK_R32_SHIFT    16
     #define SK_G32_SHIFT    8
@@ -14,11 +14,15 @@ In order to compile Skia some "adjustments" have to take place:
 on little-endian systems in order to store bitmaps in kBGRA_8888_SkColorType. This is
 in-place for the gyp build (look for SK_SAMPLES_FOR_X), not for the CMake one.
 
-2) Jpeg, Gif and Png packages are not needed but they're included by CMake nonetheless,
+This is NOT necessary for Windows (correct storage is already in place).
+
+2) For linux Jpeg, Gif and Png packages are not needed but they're included by CMake nonetheless,
 
     #find_package (GIF)
     #find_package (JPEG)
     #find_package (PNG)
+
+Windows doesn't need to exclude these.
 
 3) By default Skia is configured by CMake as a shared library, make it static:
 
