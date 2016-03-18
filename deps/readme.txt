@@ -76,3 +76,5 @@ the changes to github
 Collaborators will need to rebase (not merge) if they created branches off the old (tained) repo.
 
 More info on: https://help.github.com/articles/remove-sensitive-data/
+
+Using git LFS is recommended.
