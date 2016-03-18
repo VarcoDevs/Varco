@@ -30,6 +30,17 @@ Windows doesn't need to exclude these.
 
 Remember to update (if needed) the /deps/skia/include directory along with any .lib changes.
 
+4) Defines might be missing, on Windows SK_BUILD_FOR_WIN32 is lacking at the time of writing this
+
+    list (APPEND public_defines   "-DSK_BUILD_FOR_WIN32")
+
+and no SK_CPU_SSE_LEVEL is defined (therefore crashing at runtime if bitblitting SSE ops are performed)
+
+    if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "amd64" OR
+        ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64")
+        list (APPEND public_defines   "-DSK_CPU_SSE_LEVEL=42") # TODO: implement a proper check
+    endif()
+
 Compression for dependencies
 ============================
 
