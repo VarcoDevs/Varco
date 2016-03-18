@@ -7,7 +7,7 @@
   #include <WindowHandling/BaseOSWindow_Linux.hpp>
 #endif
 #include <UI/TabCtrl.hpp>
-#include "SkCanvas.h"
+#include <SkCanvas.h>
 
 namespace varco {
 

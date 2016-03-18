@@ -1,8 +1,8 @@
 #ifndef VARCO_BASEOSWINDOW_WIN_HPP
 #define VARCO_BASEOSWINDOW_WIN_HPP
 
-#include "SkCanvas.h"
-#include "SkSurface.h"
+#include <SkCanvas.h>
+#include <SkSurface.h>
 #include "windows.h"
 #include <functional>
 
