@@ -140,7 +140,7 @@ namespace varco {
         HDC hdc = BeginPaint(hWnd, &ps);
 
         // Call the derived update function
-        SkAutoTUnref<SkSurface> surface(this->createSurface());
+        SkAutoTUnref<SkSurface> surface(this->createSurface()); // TODO flush() before use and store the SkSurface
         SkCanvas* canvas = surface->getCanvas();
         this->draw(canvas);
 

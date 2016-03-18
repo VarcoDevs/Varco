@@ -1,16 +1,26 @@
 #ifndef VARCO_TABCTRL_HPP
 #define VARCO_TABCTRL_HPP
 
-#include "SkCanvas.h"
+#include <SkCanvas.h>
+#include <SkBitmap.h>
 #include <string>
-#include <list>
+#include <vector>
 
 namespace varco {
   class Tab {
   public:
     Tab(std::string title);
+
+    // TODO: resize
+
+    // Paint the tab into its own bitmap
+    void paint();
+    SkBitmap& getBitmap();
+
   private:
     std::string title;
+    SkBitmap bitmap; // The tab will be rendered here
+    SkRect rect;
   };
 
   class TabCtrl {
@@ -24,7 +34,7 @@ namespace varco {
 
   private:
     SkRect rect;
-    std::list<Tab> tabs;
+    std::vector<Tab> tabs;
   };
 }
 

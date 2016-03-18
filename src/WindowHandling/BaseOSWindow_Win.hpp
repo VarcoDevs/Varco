@@ -24,7 +24,7 @@ namespace varco {
     LPSTR CmdLine;
     int CmdShow;
     int Width, Height;
-    SkBitmap Bitmap;    
+    SkBitmap Bitmap;
 
   private:
     LRESULT wndProcInternal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
