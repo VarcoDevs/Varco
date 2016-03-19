@@ -1,12 +1,13 @@
 #include <UI/TabCtrl.hpp>
 #include <SkPath.h>
+#include <SkTypeface.h>
 
 namespace varco {
 
   Tab::Tab(std::string title) :
     title(title)
   {
-    rect = SkRect::MakeLTRB(0, 0, 120.0, 33.0); // Default tab rect
+    rect = SkRect::MakeLTRB(0, 0, 140.0, 33.0); // Default tab rect
     bitmap.allocPixels(SkImageInfo::Make((int)rect.width(), (int)rect.height(), kN32_SkColorType, kPremul_SkAlphaType));
   }
 
@@ -19,9 +20,9 @@ namespace varco {
     SkCanvas canvas(this->bitmap);
 
     //////////////////////////////////////////////////////////////////////
-    // Draw the background of the tab (alpha)
+    // Draw the background of the tab (alpha only)
     //////////////////////////////////////////////////////////////////////
-    canvas.clear(0x00000000);
+    canvas.clear(0x00000000); // ARGB
 
     //////////////////////////////////////////////////////////////////////
     // Draw the tab
@@ -39,11 +40,8 @@ namespace varco {
     SkScalar tabBezierWidth = 18;
 
     SkPaint tabBorderPaint;
-    tabBorderPaint.setStyle(SkPaint::kStroke_Style);
-    tabBorderPaint.setStrokeWidth(1);
-    tabBorderPaint.setColor(0xff1f78b4);
-    tabBorderPaint.setAntiAlias(true);
-    tabBorderPaint.setStrokeCap(SkPaint::kRound_Cap);
+    tabBorderPaint.setStyle(SkPaint::kFill_Style);
+    tabBorderPaint.setColor(SkColorSetARGB(255, 40, 40, 40));
     SkRect tabRect = SkRect::MakeLTRB(0, 5 /* top padding */, this->rect.width(), this->rect.fBottom);
     SkScalar yDistanceBetweenBezierPoints = (tabRect.fBottom - tabRect.fTop) / 4.0f;
 
@@ -66,7 +64,22 @@ namespace varco {
       tabRect.fRight - tabBezierWidth + ((1.0f - 0.60f) * tabBezierWidth), tabRect.fBottom, // C1
       tabRect.fRight, tabRect.fBottom // P0
       );
-    canvas.drawPath(path, tabBorderPaint);
+    canvas.drawPath(path, tabBorderPaint); // Fill
+
+    tabBorderPaint.setStyle(SkPaint::kStroke_Style);
+    tabBorderPaint.setStrokeWidth(1);
+    tabBorderPaint.setAntiAlias(true);
+    tabBorderPaint.setStrokeCap(SkPaint::kRound_Cap);
+    tabBorderPaint.setColor(SkColorSetARGB(255, 70, 70, 70));
+    canvas.drawPath(path, tabBorderPaint); // Stroke
+
+    SkTypeface *monospaceTypeface = SkTypeface::CreateFromName("Consolas", SkTypeface::kNormal); // Or closest match
+    SkPaint tabTextPaint;
+    tabTextPaint.setColor(SK_ColorWHITE);
+    tabTextPaint.setTextSize(SkIntToScalar(12));
+    tabTextPaint.setAntiAlias(true);
+    tabTextPaint.setTypeface(monospaceTypeface);
+    canvas.drawText(title.data(), title.size(), tabRect.fLeft + 10, tabRect.fBottom - 10, tabTextPaint);
 
     canvas.flush();
   }
@@ -93,7 +106,7 @@ namespace varco {
     // Draw the background of the control
     //////////////////////////////////////////////////////////////////////
     SkPaint background;
-    background.setColor(SkColorSetARGB(255, 39, 40, 34));
+    background.setColor(SkColorSetARGB(255, 20, 20, 20));
     canvas->drawRect(this->rect, background);
 
   
