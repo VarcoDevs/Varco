@@ -9,7 +9,37 @@ set (LIBS)
 find_package (OpenGL REQUIRED)
 list (APPEND LIBS ${OPENGL_LIBRARIES})
 
-########################################### Skia dependency ########################################### 
+########################################### Skia dependency ###########################################
+
+# 7zip is used to decompress during configure the necessary dependencies
+set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Decompress binaries if needed
+if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skia.lib)
+  message (STATUS "Decompressing Win64 Skia binaries...")
+
+  # Important: dependencies MUST be available
+  if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia.7z)
+    message (FATAL_ERROR "[ERROR] 'deps/skia.7z' unavailable - please download it from https://github.com/VarcoDevs/Varco/releases")
+  endif()
+
+
+  # 7zip is preferable, but as a fallback use cmake built-in 7zip module
+  find_package (SevenZip)
+  if (NOT SEVENZIP_FOUND)
+    message (STATUS "[FALLBACK] CMake will be used to decompress dependencies")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_SOURCE_DIR}/deps/skia.7z
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps # Folder where to decompress stuff
+    )
+  else() # Use 7Zip
+    execute_process(
+        COMMAND ${SEVENZIP_BINARY} x ${CMAKE_SOURCE_DIR}/deps/skia.7z
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps # Folder where to decompress stuff
+    )
+  endif()
+endif()
+
 list (APPEND INCLUDES 
                         deps/skia/include/android
                         deps/skia/include/animator
@@ -30,9 +60,6 @@ list (APPEND INCLUDES
                         deps/skia/include/views
                         deps/skia/include/xml)
 
-# 7zip is used to decompress during configure the necessary dependencies
-set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
 if (WIN32)
   set (WINDOWHANDLING_SRCS 
           src/WindowHandling/BaseOSWindow_Win.cpp
@@ -43,31 +70,13 @@ if (WIN32)
           optimized;${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skia.lib;
           debug;${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skiad.lib;)
 
-  # Decompress binaries if needed
   if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skia.lib)
-    message (STATUS "Decompressing Win64 Skia binaries...")
-    # 7zip is preferable, but as a fallback use cmake built-in 7zip module
-    find_package (SevenZip)
-    if (NOT SEVENZIP_FOUND)
-      message (STATUS "[FALLBACK] CMake will be used to decompress dependencies")
-      execute_process(
-          COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/libs.7z
-          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64 # Folder where to decompress stuff
-      )
-    else() # Use 7Zip
-      execute_process(
-          COMMAND ${SEVENZIP_BINARY} x ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/libs.7z
-          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64 # Folder where to decompress stuff
-      )
-    endif()
-    if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skia.lib)
-      message (FATAL "[ERROR] Could not decompress dependencies - either install 7zip or unpack them manually")
-    endif()
-    # Copy debug information for skia into the debug build directory
-    message(STATUS "going to ${CMAKE_BINARY_DIR}" )
-    file(COPY ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skiad.pdb DESTINATION ${CMAKE_BINARY_DIR}/Debug)
-    file(RENAME ${CMAKE_BINARY_DIR}/Debug/skiad.pdb ${CMAKE_BINARY_DIR}/Debug/skia.pdb)
-  endif() 
+    message (FATAL_ERROR "[ERROR] Could not decompress dependencies - either install 7zip or unpack them manually")
+  endif()
+  # Copy debug information for skia into the debug build directory
+  message(STATUS "Copying debug information to build directory.." )
+  file(COPY ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skiad.pdb DESTINATION ${CMAKE_BINARY_DIR}/Debug)
+  file(RENAME ${CMAKE_BINARY_DIR}/Debug/skiad.pdb ${CMAKE_BINARY_DIR}/Debug/skia.pdb)
 endif()
 if (UNIX)
   set (WINDOWHANDLING_SRCS
@@ -79,29 +88,11 @@ if (UNIX)
           optimized;${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libskia.a;
           debug;${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libskiad.a;)
 
-  # Decompress binaries if needed
   if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libskia.a)
-    message (STATUS "Decompressing Unix Skia binaries...")
-    # 7zip is preferable, but as a fallback use cmake built-in 7zip module
-    find_package (SevenZip)
-    if (NOT SEVENZIP_FOUND)
-      message (STATUS "[FALLBACK] CMake will be used to decompress dependencies")
-      execute_process(
-          COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libs.7z
-          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps/skia/libs/linux # Folder where to decompress stuff
-      )      
-    else() # Use 7Zip
-      execute_process(
-          COMMAND ${SEVENZIP_BINARY} x ${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libs.7z
-          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps/skia/libs/linux # Folder where to decompress stuff
-      )
-    endif()
-    if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libskia.a)
-      message (FATAL "[ERROR] Could not decompress dependencies - either install 7zip or unpack them manually")
-    endif()
-  endif() 
+    message (FATAL_ERROR "[ERROR] Could not decompress dependencies - either install 7zip or unpack them manually")
+  endif()
 endif()
-########################################### Skia dependency ########################################### 
+########################################## End Skia dependency ##########################################
 
 list (APPEND SRCS ${WINDOWHANDLING_SRCS})
 source_group (WindowHandling FILES ${WINDOWHANDLING_SRCS})
@@ -115,7 +106,8 @@ source_group (UI FILES ${UI_SRCS})
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})
 target_link_libraries (varco ${LIBS})
-if (UNIX)
+
+if (UNIX) # Additional unix libraries required
 
   #X11
 	find_package ( X11 REQUIRED )
