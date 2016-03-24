@@ -26,30 +26,21 @@ namespace varco {
     // Draw the TabCtrl region if needed
     tabCtrl.setRect(tabCtrlRect);
     tabCtrl.paint(canvas);
-
-
-
-//    // Set up a linear gradient and draw a circle
-//    {
-//      SkPoint linearPoints[] = {
-//        { 0, 0 },
-//        { 300, 300 }
-//      };
-//      SkColor linearColors[] = { SK_ColorGREEN, SK_ColorBLACK };
-
-//      SkShader* shader = SkGradientShader::CreateLinear(
-//        linearPoints, linearColors, NULL, 2,
-//        SkShader::kMirror_TileMode);
-//      SkAutoUnref shader_deleter(shader);
-
-//      paint.setShader(shader);
-//      paint.setFlags(SkPaint::kAntiAlias_Flag);
-
-//      canvas->drawCircle(200, 200, 64, paint);
-
-//      // Detach shader
-//      paint.setShader(NULL);
-//    }
-
   }
+
+
+  bool MainWindow::onMouseDown(int x, int y) {
+    // Forward the event to the container control
+    auto isPointInsideRect = [](SkScalar x, SkScalar y, SkRect rect) {
+      if (rect.fLeft <= x && rect.fTop <= y && rect.fRight >= x && rect.fBottom >= y)
+        return true;
+      else
+        return false;
+    };
+    SkScalar skX(static_cast<SkScalar>(x)), skY(static_cast<SkScalar>(y));
+    if (isPointInsideRect(skX, skY, tabCtrl.getRect())) {
+      return tabCtrl.onMouseClick(skX, skY);
+    }
+  }
+
 } // namespace varco

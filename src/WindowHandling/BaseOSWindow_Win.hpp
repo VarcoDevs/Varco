@@ -5,6 +5,7 @@
 #include <SkSurface.h>
 #include "windows.h"
 #include <functional>
+#include <memory>
 
 namespace varco {
 
@@ -17,6 +18,7 @@ namespace varco {
     int show();
 
     virtual void draw(SkCanvas *canvas) = 0;
+    virtual bool onMouseDown(int x, int y) = 0; // Returns true if a redraw is needed
 
   protected:
     HINSTANCE Instance, PrevInstance;
@@ -34,6 +36,7 @@ namespace varco {
     void resize(int width, int height);
 
     SkSurface* createSurface();
+    std::unique_ptr<SkSurface> surface;
   };
 
 }

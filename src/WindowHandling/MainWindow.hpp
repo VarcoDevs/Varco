@@ -22,6 +22,7 @@ namespace varco {
 #endif
 
     void draw(SkCanvas *canvas) override;
+    bool onMouseDown(int x, int y) override; // Returns true if a redraw is needed
 
   private:
     TabCtrl tabCtrl;

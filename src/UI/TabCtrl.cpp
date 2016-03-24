@@ -1,6 +1,6 @@
 #include <UI/TabCtrl.hpp>
-#include <SkPath.h>
 #include <SkTypeface.h>
+#include <SkGradientShader.h>
 
 namespace varco {
 
@@ -13,6 +13,26 @@ namespace varco {
 
   SkBitmap& Tab::getBitmap() {
     return this->bitmap;
+  }
+
+  SkRect Tab::getRect() {
+    return this->rect;
+  }
+
+  SkPath Tab::getPath() {
+    return this->path;
+  }
+
+  void Tab::setSelected(bool selected) {
+    this->selected = selected;
+  }
+
+  void Tab::setOffset(SkScalar offset) {
+    this->parentOffset = offset;
+  }
+
+  SkScalar Tab::getOffset() {
+    return this->parentOffset;
   }
 
   void Tab::paint() {
@@ -35,17 +55,20 @@ namespace varco {
     //           <->
     //    ---------
     //   /         \
-        //  /           \
+    //  /           \
     //  <--tabWidth-->
     SkScalar tabBezierWidth = 18;
 
     SkPaint tabBorderPaint;
     tabBorderPaint.setStyle(SkPaint::kFill_Style);
-    tabBorderPaint.setColor(SkColorSetARGB(255, 40, 40, 40));
+    if (this->selected == false)
+      tabBorderPaint.setColor(SkColorSetARGB(255, 40, 40, 40));
+    else
+      tabBorderPaint.setColor(SkColorSetARGB(255, 255, 60, 60));
     SkRect tabRect = SkRect::MakeLTRB(0, 5 /* top padding */, this->rect.width(), this->rect.fBottom);
     SkScalar yDistanceBetweenBezierPoints = (tabRect.fBottom - tabRect.fTop) / 4.0f;
 
-    SkPath path;
+    path.reset();
     //    _ P2
     // C2/
     //   \_
@@ -73,27 +96,52 @@ namespace varco {
     tabBorderPaint.setColor(SkColorSetARGB(255, 70, 70, 70));
     canvas.drawPath(path, tabBorderPaint); // Stroke
 
-    SkTypeface *monospaceTypeface = SkTypeface::CreateFromName("Consolas", SkTypeface::kNormal); // Or closest match
+    SkTypeface *arialTypeface = SkTypeface::CreateFromName("Arial", SkTypeface::kNormal); // Or closest match
     SkPaint tabTextPaint;
     tabTextPaint.setColor(SK_ColorWHITE);
-    tabTextPaint.setTextSize(SkIntToScalar(12));
+    tabTextPaint.setAlpha(255);
+    tabTextPaint.setTextSize(SkIntToScalar(11));
     tabTextPaint.setAntiAlias(true);
-    tabTextPaint.setTypeface(monospaceTypeface);
-    canvas.drawText(title.data(), title.size(), tabRect.fLeft + 10, tabRect.fBottom - 10, tabTextPaint);
+    tabTextPaint.setLCDRenderText(true);
+    tabTextPaint.setTypeface(arialTypeface);
+
+    SkRect textRect = SkRect::MakeLTRB(tabRect.fLeft + 20, tabRect.fTop + 5, tabRect.fRight - 15, tabRect.fBottom - 5);
+    canvas.save();
+    canvas.clipRect(textRect);
+    SkPoint points[2] = {
+      SkPoint::Make(textRect.right() - 15, textRect.top()),
+      SkPoint::Make(textRect.right(), textRect.top())
+    };
+    SkColor colors[2] = { 0xFFFFFFFF, 0x0}; // Opaque white to transparent
+    SkShader* shader = SkGradientShader::CreateLinear(points, colors, NULL, 2, SkShader::kClamp_TileMode, 0, NULL);
+    tabTextPaint.setShader(shader);
+    canvas.drawText(title.data(), title.size(), tabRect.fLeft + 20, tabRect.fBottom - 10, tabTextPaint);
+    canvas.restore();
 
     canvas.flush();
   }
 
   TabCtrl::TabCtrl() {
     // DEBUG - add some tabs
-    tabs.emplace_back("Tab0");
+    tabs.emplace_back("ALOTOFTEXTALOTOFTEXT");
+    tabs.emplace_back("Second tab");
+    tabs.emplace_back("Third tab");
   }
   
   void TabCtrl::setRect(SkRect rect) {
     this->rect = rect;
   }
 
-  void TabCtrl::paint(SkCanvas *canvas) {
+  SkRect TabCtrl::getRect() {
+    return this->rect;
+  }
+
+  void TabCtrl::paint(SkCanvas *canvas = nullptr) {
+
+    if (canvas == nullptr)
+      canvas = lastCanvas;
+    else
+      lastCanvas = canvas; // Save for later redrawing if needed
 
     // TODO: redraw only if necessary
 
@@ -109,16 +157,46 @@ namespace varco {
     background.setColor(SkColorSetARGB(255, 20, 20, 20));
     canvas->drawRect(this->rect, background);
 
-  
+    SkScalar tabOffset = 0.0f;
     for (auto i = 0; i < tabs.size(); ++i) {
       Tab& tab = tabs[i];
+      tab.setOffset(tabOffset);
       tab.paint(); // Render tab
-      canvas->drawBitmap(tab.getBitmap(), this->rect.fLeft, this->rect.fTop);
+      canvas->drawBitmap(tab.getBitmap(), this->rect.fLeft + tabOffset, this->rect.fTop);
+      tabOffset += tab.getRect().width() - 20.0f;      
     }
 
     canvas->flush();
 
     canvas->restore();
-  }  
+  }
+
+  bool TabCtrl::onMouseClick(SkScalar x, SkScalar y) {
+    
+    SkPoint relativeToTabCtrl = SkPoint::Make(x - this->rect.fLeft, y - this->rect.fTop);
+    
+    // Detect if the click was on a tab
+    bool redrawNeeded = false;
+    for (auto i = 0; i < tabs.size(); ++i) {
+      Tab& tab = tabs[i];
+
+      SkPoint relativeToTab = SkPoint::Make(relativeToTabCtrl.x() - tab.getOffset(), relativeToTabCtrl.y());
+
+      if (tab.getPath().contains(relativeToTab.x(), relativeToTab.y()) == true) {
+        redrawNeeded = true;
+
+        if (selectedTab != -1) // Deselect old selected tab
+          tabs[selectedTab].setSelected(false);
+
+        selectedTab = i;
+        tab.setSelected(true);
+      }
+    }
+
+    if (redrawNeeded)
+      return true;
+    else
+      return false;
+  }
 
 }

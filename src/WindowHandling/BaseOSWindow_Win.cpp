@@ -119,13 +119,21 @@ namespace varco {
         return 1; // Do not draw the background
       } break;
 
+      case WM_LBUTTONDOWN: {
+        auto x = LOWORD(lParam);
+        auto y = HIWORD(lParam);
+        bool ret = this->onMouseDown(x, y);
+        if (ret)
+          InvalidateRect(hWnd, NULL, 0);
+      } break;
+
       case WM_MOUSEMOVE: {
       
       } break;
 
       case WM_SIZE: {
-        INT width = LOWORD(lParam);
-        INT height = HIWORD(lParam);
+        auto width = LOWORD(lParam);
+        auto height = HIWORD(lParam);
         this->resize(width, height);
 
         InvalidateRect(hWnd, NULL, 0);
@@ -139,8 +147,7 @@ namespace varco {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
 
-        // Call the derived update function
-        SkAutoTUnref<SkSurface> surface(this->createSurface()); // TODO flush() before use and store the SkSurface
+        // Call the derived update function        
         SkCanvas* canvas = surface->getCanvas();
         this->draw(canvas);
 
@@ -200,13 +207,14 @@ namespace varco {
   }
 
   void BaseOSWindow::resize(int width, int height) {
-    if (width != Bitmap.width() || height != Bitmap.height())
-    {
+    if (width != Bitmap.width() || height != Bitmap.height()) {
       Bitmap.allocPixels(SkImageInfo::Make(width, height,
                          kN32_SkColorType, kPremul_SkAlphaType));
       this->Width = width;
       this->Height = height;
     }
+    // Recreate the surface
+    this->surface.reset(createSurface()); // TODO flush() before use and store the SkSurface
   }
 
   // Create a surface from the bitmap info (the canvas will draw in here)
