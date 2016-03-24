@@ -84,6 +84,18 @@ namespace varco {
 
   static Atom wm_delete_window_message;
 
+  namespace {
+
+    void invalidateWindow(Display *display, Window window) { // Fire a redraw() event
+      XEvent exppp;
+      memset(&exppp, 0, sizeof(exppp));
+      exppp.type = Expose;
+      exppp.xexpose.window = window;
+      XSendEvent(display, window, False, ExposureMask, &exppp);
+    }
+
+  }
+
   bool BaseOSWindow::wndProc(XEvent *evt) {
 
     switch (evt->type) {
@@ -93,9 +105,8 @@ namespace varco {
         if (!(Width > 0 && Height > 0))
           return 1; // Nonsense painting a 0 area
 
-        // Call the derived update function
-        SkAutoTUnref<SkSurface> surface(this->createSurface());
-        SkCanvas* canvas = surface->getCanvas();
+        // Call the OS-independent draw function
+        SkCanvas canvas(this->Bitmap);
         this->draw(canvas);
 
         // Finally do the painting after the drawing is done
@@ -106,17 +117,30 @@ namespace varco {
       case ConfigureNotify: {
         this->resize(evt->xconfigure.width, evt->xconfigure.height);
 
-        // Fire a redraw() event
-        XEvent exppp;
-        memset(&exppp, 0, sizeof(exppp));
-        exppp.type = Expose;
-        exppp.xexpose.window = fWin;
-        XSendEvent(fDisplay, fWin, False, ExposureMask, &exppp);
+        invalidateWindow(this->fDisplay, this->fWin);
       } break;
 
       case ClientMessage: {
         if ((Atom)evt->xclient.data.l[0] == wm_delete_window_message)
           return false;
+      } break;
+
+      case ButtonPress: { // Mouse input
+
+        switch (evt->xbutton.button) {
+
+          case Button1: {
+            int x = evt->xbutton.x;
+            int y = evt->xbutton.y;
+
+            bool ret = this->onMouseDown(x, y);
+            if (ret)
+              invalidateWindow(this->fDisplay, this->fWin);
+          } break;
+
+          default:
+            break;
+        }
       } break;
 
       default: // fallthrough
@@ -179,12 +203,6 @@ namespace varco {
               0, 0,     // src x,y
               0, 0,     // dst x,y
               width, height);
-  }
-
-  // Create a surface from the bitmap info (the canvas will draw in here)
-  SkSurface* BaseOSWindow::createSurface() {
-    const SkSurfaceProps fSurfaceProps = SkSurfaceProps::kLegacyFontHost_InitType;
-    return SkSurface::NewRasterDirect(Bitmap.info(), Bitmap.getPixels(), Bitmap.rowBytes(), &fSurfaceProps);
   }
 
 } // namespace varco

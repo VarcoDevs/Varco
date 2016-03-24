@@ -16,7 +16,8 @@ namespace varco {
 
     int show();
 
-    virtual void draw(SkCanvas *canvas) = 0;
+    virtual void draw(SkCanvas& canvas) = 0;
+    virtual bool onMouseDown(SkScalar x, SkScalar y) = 0;
 
   protected:
     int Argc;
@@ -33,7 +34,6 @@ namespace varco {
 
     void mapWindowAndWait();
     bool wndProc(XEvent *evt); // Returns false to exit the loop
-    SkSurface* createSurface();
     void resize(int width, int height);
     void paint();
   };

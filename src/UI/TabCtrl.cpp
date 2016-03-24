@@ -137,7 +137,7 @@ namespace varco {
   void TabCtrl::resize(SkRect rect) {
     if (this->rect != rect) {
       this->rect = rect;
-      bitmap.allocPixels(SkImageInfo::Make((int)rect.width(), (int)rect.height(), kN32_SkColorType, kPremul_SkAlphaType));      
+      this->bitmap.allocPixels(SkImageInfo::Make((int)rect.width(), (int)rect.height(), kN32_SkColorType, kPremul_SkAlphaType));
       dirty = true;
     }
   }
