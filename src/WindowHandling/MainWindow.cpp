@@ -1,7 +1,6 @@
 #include <WindowHandling/MainWindow.hpp>
-#include "SkCanvas.h"
-#include "SkGradientShader.h"
-#include "SkGraphics.h"
+#include <SkCanvas.h>
+#include <Utils/Utils.hpp>
 
 
 namespace varco {
@@ -17,30 +16,28 @@ namespace varco {
   {}
 
   // Main window drawing entry point
-  void MainWindow::draw(SkCanvas *canvas) {
+  void MainWindow::draw(SkCanvas& canvas) {
     // Clear background color
-    canvas->drawColor(SK_ColorWHITE);
+    canvas.drawColor(SK_ColorWHITE);
 
     // Calculate TabCtrl region
-    SkRect tabCtrlRect = SkRect::MakeLTRB(0, 0, (SkScalar)this->Width, 33);
+    SkRect tabCtrlRect = SkRect::MakeLTRB(0, 0, (SkScalar)this->Width, 33.0f);
     // Draw the TabCtrl region if needed
-    tabCtrl.setRect(tabCtrlRect);
-    tabCtrl.paint(canvas);
+    tabCtrl.resize(tabCtrlRect);
+    tabCtrl.paint();
+    canvas.drawBitmap(tabCtrl.getBitmap(), tabCtrlRect.fLeft, tabCtrlRect.fTop);
   }
 
 
-  bool MainWindow::onMouseDown(int x, int y) {
-    // Forward the event to the container control
-    auto isPointInsideRect = [](SkScalar x, SkScalar y, SkRect rect) {
-      if (rect.fLeft <= x && rect.fTop <= y && rect.fRight >= x && rect.fBottom >= y)
-        return true;
-      else
-        return false;
-    };
-    SkScalar skX(static_cast<SkScalar>(x)), skY(static_cast<SkScalar>(y));
-    if (isPointInsideRect(skX, skY, tabCtrl.getRect())) {
-      return tabCtrl.onMouseClick(skX, skY);
-    }
+  bool MainWindow::onMouseDown(SkScalar x, SkScalar y) {
+
+    // Forward the event to a container control
+    if (isPointInsideRect(x, y, tabCtrl.getRect()))
+      return tabCtrl.onMouseClick(x, y);
+
+    // [] Other controls' tests should go here
+
+    return false;
   }
 
 } // namespace varco

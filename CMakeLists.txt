@@ -103,6 +103,11 @@ set (UI_SRCS
 list (APPEND SRCS ${UI_SRCS})
 source_group (UI FILES ${UI_SRCS})
 
+set (UTILS_SRCS
+            src/Utils/Utils.hpp)
+list (APPEND SRCS ${UTILS_SRCS})
+source_group (Utils FILES ${UTILS_SRCS})
+
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})
 target_link_libraries (varco ${LIBS})

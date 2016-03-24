@@ -1,4 +1,5 @@
 #include <WindowHandling/BaseOSWindow_Win.hpp>
+#include <Utils/Utils.hpp>
 
 // Specify the windows subsystem
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
@@ -147,8 +148,8 @@ namespace varco {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
 
-        // Call the derived update function        
-        SkCanvas* canvas = surface->getCanvas();
+        // Call the OS-independent draw function        
+        SkCanvas canvas(this->Bitmap);
         this->draw(canvas);
 
         // Finally do the painting after the drawing is done
@@ -214,13 +215,7 @@ namespace varco {
       this->Height = height;
     }
     // Recreate the surface
-    this->surface.reset(createSurface()); // TODO flush() before use and store the SkSurface
-  }
-
-  // Create a surface from the bitmap info (the canvas will draw in here)
-  SkSurface* BaseOSWindow::createSurface() {
-    const SkSurfaceProps fSurfaceProps = SkSurfaceProps::kLegacyFontHost_InitType;
-    return SkSurface::NewRasterDirect(Bitmap.info(), Bitmap.getPixels(), Bitmap.rowBytes(), &fSurfaceProps);
-  }
+    //this->surface.reset(createSurfaceFromBitmap(Bitmap));
+  }  
 
 } // namespace varco

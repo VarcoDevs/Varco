@@ -15,14 +15,13 @@ namespace varco {
   public:
 
 #ifdef _WIN32
-    MainWindow(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, 
-               int nCmdShow);
+    MainWindow(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow);
 #elif defined __linux__
     MainWindow(int argc, char **argv);
 #endif
 
-    void draw(SkCanvas *canvas) override;
-    bool onMouseDown(int x, int y) override; // Returns true if a redraw is needed
+    void draw(SkCanvas& canvas) override;
+    bool onMouseDown(SkScalar x, SkScalar y) override; // Returns true if a redraw is needed
 
   private:
     TabCtrl tabCtrl;

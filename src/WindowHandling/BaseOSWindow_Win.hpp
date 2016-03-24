@@ -17,8 +17,8 @@ namespace varco {
 
     int show();
 
-    virtual void draw(SkCanvas *canvas) = 0;
-    virtual bool onMouseDown(int x, int y) = 0; // Returns true if a redraw is needed
+    virtual void draw(SkCanvas& canvas) = 0;
+    virtual bool onMouseDown(SkScalar x, SkScalar y) = 0; // Returns true if a redraw is needed
 
   protected:
     HINSTANCE Instance, PrevInstance;
@@ -35,7 +35,6 @@ namespace varco {
     void paint(HDC hdc, bool aero = false);
     void resize(int width, int height);
 
-    SkSurface* createSurface();
     std::unique_ptr<SkSurface> surface;
   };
 
