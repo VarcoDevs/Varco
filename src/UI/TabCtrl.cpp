@@ -117,7 +117,7 @@ namespace varco {
       SkPoint::Make(textRect.right(), textRect.top())
     };
     SkColor colors[2] = { 0xFFFFFFFF, 0x0}; // Opaque white to transparent
-    SkShader* shader = SkGradientShader::CreateLinear(points, colors, NULL, 2, SkShader::kClamp_TileMode, 0, NULL);
+    auto shader = SkGradientShader::MakeLinear(points, colors, NULL, 2, SkShader::kClamp_TileMode, 0, NULL);
     tabTextPaint.setShader(shader);
     canvas.drawText(title.data(), title.size(), tabRect.fLeft + 20, tabRect.fBottom - 10, tabTextPaint);
 

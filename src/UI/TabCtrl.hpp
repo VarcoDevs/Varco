@@ -49,7 +49,6 @@ namespace varco {
   private:
     SkRect rect; // Rect where to draw the control, relative to the client area of the parent
     SkBitmap bitmap; // The entire control will be rendered here
-    std::unique_ptr<SkSurface> surface;
     bool dirty = true;
     std::vector<Tab> tabs;
     size_t selectedTab = -1; // The index of the selected tab

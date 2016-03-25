@@ -111,6 +111,10 @@ source_group (Utils FILES ${UTILS_SRCS})
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})
 target_link_libraries (varco ${LIBS})
+if (UNIX)
+  #X11 specifies a different default order for RGBA samples (BGRA)
+  target_compile_definitions(varco PRIVATE -DSK_SAMPLES_FOR_X)
+endif()
 
 if (UNIX) # Additional unix libraries required
 

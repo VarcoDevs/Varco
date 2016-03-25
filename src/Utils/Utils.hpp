@@ -1,8 +1,6 @@
 #ifndef VARCO_UTILS_HPP
 #define VARCO_UTILS_HPP
 
-#include <SkSurface.h>
-
 namespace varco {
   
   template<typename T>
@@ -14,12 +12,6 @@ namespace varco {
     else
       return false;
   };
-
-  // Create a surface from a bitmap
-  inline SkSurface* createSurfaceFromBitmap(SkBitmap& bitmap) {
-    const SkSurfaceProps fSurfaceProps = SkSurfaceProps::kLegacyFontHost_InitType;
-    return SkSurface::NewRasterDirect(bitmap.info(), bitmap.getPixels(), bitmap.rowBytes(), &fSurfaceProps);
-  }
 
 }
 

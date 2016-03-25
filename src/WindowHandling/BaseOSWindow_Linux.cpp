@@ -75,7 +75,7 @@ namespace varco {
   void BaseOSWindow::resize(int width, int height) {
     if (width != Bitmap.width() || height != Bitmap.height()) {
       Bitmap.allocPixels(SkImageInfo::Make(width, height,
-                                           kBGRA_8888_SkColorType,
+                                           kN32_SkColorType,
                                            kPremul_SkAlphaType));
       this->Width = width;
       this->Height = height;
