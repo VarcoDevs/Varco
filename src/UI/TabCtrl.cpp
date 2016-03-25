@@ -5,7 +5,7 @@
 
 namespace varco {
 
-  static SkRect tabDefaultRect = SkRect::MakeLTRB(0, 0, 140.0, 33.0); // The rect that encloses the tab (coords relative to the tab element)
+  static SkRect tabDefaultRect = SkRect::MakeLTRB(0, 0, 150.0, 33.0); // The rect that encloses the tab (coords relative to the tab control)
 
   Tab::Tab(TabCtrl& parent, std::string title) :
     parent(parent),
@@ -63,12 +63,20 @@ namespace varco {
     //  <--tabWidth-->
     SkScalar tabBezierWidth = 18;
 
-    SkPaint tabBorderPaint;
-    tabBorderPaint.setStyle(SkPaint::kFill_Style);
-    if (this->selected == false)
-      tabBorderPaint.setColor(SkColorSetARGB(255, 40, 40, 40));
-    else
-      tabBorderPaint.setColor(SkColorSetARGB(255, 255, 60, 60));
+    SkPaint tabBorderPaint;    
+    SkPoint topToBottomPoints[2] = {
+      SkPoint::Make(tabDefaultRect.width() / 2.0f, tabDefaultRect.top()),
+      SkPoint::Make(tabDefaultRect.width() / 2.0f, tabDefaultRect.bottom())
+    };
+    if (this->selected == true) {      
+      SkColor colors[2] = { SkColorSetARGB(255, 52, 53, 57), SkColorSetARGB(255, 39, 40, 34) };
+      auto shader = SkGradientShader::MakeLinear(topToBottomPoints, colors, NULL, 2, SkShader::kClamp_TileMode, 0, NULL);
+      tabBorderPaint.setShader(shader);
+    } else {      
+      SkColor colors[2] = { SkColorSetARGB(255, 78, 78, 76), SkColorSetARGB(255, 48, 48, 46) };
+      auto shader = SkGradientShader::MakeLinear(topToBottomPoints, colors, NULL, 2, SkShader::kClamp_TileMode, 0, NULL);
+      tabBorderPaint.setShader(shader);
+    }
     SkRect tabRect = SkRect::MakeLTRB(0, 5 /* top padding */, tabDefaultRect.width(), tabDefaultRect.fBottom);
     SkScalar yDistanceBetweenBezierPoints = (tabRect.fBottom - tabRect.fTop) / 4.0f;
 
@@ -83,15 +91,21 @@ namespace varco {
     path.cubicTo(
       tabRect.fLeft + (0.60f * tabBezierWidth), tabRect.fBottom, // C1
       tabRect.fLeft + (0.64f * tabBezierWidth), tabRect.fTop, // C2
-      tabRect.fLeft + tabBezierWidth, tabRect.fTop // P2
+      tabRect.fLeft + tabBezierWidth, tabRect.fTop + 1.0f // P2
       );
-    path.lineTo(tabRect.fRight - tabBezierWidth, tabRect.fTop); // P2
+    path.lineTo(tabRect.fRight - tabBezierWidth, tabRect.fTop + 1.0f); // P2
     path.cubicTo(
       tabRect.fRight - tabBezierWidth + ((1.0f - 0.64f) * tabBezierWidth), tabRect.fTop, // C2
       tabRect.fRight - tabBezierWidth + ((1.0f - 0.60f) * tabBezierWidth), tabRect.fBottom, // C1
       tabRect.fRight, tabRect.fBottom // P0
       );
-    canvas.drawPath(path, tabBorderPaint); // Fill
+    tabBorderPaint.setStyle(SkPaint::kFill_Style); // Fill with the background color
+    canvas.drawPath(path, tabBorderPaint);
+
+    tabBorderPaint.setShader(nullptr);
+    tabBorderPaint.setStyle(SkPaint::kStroke_Style); // Remark the contour with a line color
+    tabBorderPaint.setColor(SkColorSetARGB(255, 54, 55, 49));
+    canvas.drawPath(path, tabBorderPaint);
 
     tabBorderPaint.setStyle(SkPaint::kStroke_Style);
     tabBorderPaint.setStrokeWidth(1);
@@ -167,18 +181,41 @@ namespace varco {
     //////////////////////////////////////////////////////////////////////
     // Draw the background of the control
     //////////////////////////////////////////////////////////////////////
-    SkPaint background;
-    background.setColor(SkColorSetARGB(255, 20, 20, 20));
-    canvas.drawRect(this->rect, background);
+    {
+      SkPaint background;
+      background.setColor(SkColorSetARGB(255, 20, 20, 20));
+      canvas.drawRect(this->rect, background);
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    // Render all tabs, but only draw unselected ones
+    //////////////////////////////////////////////////////////////////////
 
     SkScalar tabOffset = 0.0f;
     for (auto i = 0; i < tabs.size(); ++i) {
       Tab& tab = tabs[i];
-      tab.setOffset(tabOffset);
-      tab.paint(); // Render tab
-      canvas.drawBitmap(tab.getBitmap(), this->rect.fLeft + tabOffset, this->rect.fTop);
+      tab.setOffset(tabOffset);      
+      tab.paint(); // Render the tab into its own buffer
+      if (i != selectedTab) // The selected one is drawn AFTER all the others
+        canvas.drawBitmap(tab.getBitmap(), this->rect.fLeft + tabOffset, this->rect.fTop);
       tabOffset += tabDefaultRect.width() - 20.0f;      
     }
+
+    //////////////////////////////////////////////////////////////////////
+    // Draw an horizontal line to separate code area from tabs
+    //////////////////////////////////////////////////////////////////////
+    {
+      SkPaint line;
+      line.setColor(SkColorSetARGB(255, 54, 55, 49));
+      line.setStrokeWidth(2.0);
+      canvas.drawLine(this->rect.left(), this->rect.bottom() - 1.5f, this->rect.right(), this->rect.bottom() - 1.5f, line);
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    // Now if there's a selected one, draw it last
+    //////////////////////////////////////////////////////////////////////
+    if (selectedTab != -1)
+      canvas.drawBitmap(tabs[selectedTab].getBitmap(), this->rect.fLeft + tabs[selectedTab].getOffset(), this->rect.fTop);
 
     canvas.flush();
     dirty = false;
