@@ -105,6 +105,19 @@ namespace varco {
     return static_cast<int>(Msg.wParam);
   }
 
+  namespace {
+    VirtualKeycode remapKeyToVarcoKey(WPARAM param) { // Windows-specific keycodes remapping
+      using enumType = std::underlying_type<VirtualKeycode>::type;
+
+      if (param >= 'A' && param <= 'Z')
+        return static_cast<VirtualKeycode>(static_cast<enumType>(VirtualKeycode::VK_A) + (param - 'A'));
+      else if (param >= '0' && param <= '9')
+        return static_cast<VirtualKeycode>(static_cast<enumType>(VirtualKeycode::VK_0) + (param - '0'));
+      else
+        return VirtualKeycode::VK_UNRECOGNIZED;
+    }
+  }
+
   LRESULT BaseOSWindow::wndProcInternal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
 
@@ -123,9 +136,11 @@ namespace varco {
       case WM_LBUTTONDOWN: {
         auto x = LOWORD(lParam);
         auto y = HIWORD(lParam);
-        bool ret = this->onMouseDown(x, y);
-        if (ret)
-          InvalidateRect(hWnd, NULL, 0);
+        this->onLeftMouseDown(x, y);
+      } break;
+
+      case WM_KEYDOWN: {
+        this->onKeyDown(remapKeyToVarcoKey(wParam));
       } break;
 
       case WM_MOUSEMOVE: {
@@ -161,6 +176,10 @@ namespace varco {
 
     }
     return DefWindowProc(hWnd, message, wParam, lParam);
+  }
+
+  void BaseOSWindow::redraw() {
+    InvalidateRect(this->hWnd, nullptr, FALSE); // Send a WM_PAINT
   }
 
   // BitBlt the rendered window into the device context
@@ -209,13 +228,10 @@ namespace varco {
 
   void BaseOSWindow::resize(int width, int height) {
     if (width != Bitmap.width() || height != Bitmap.height()) {
-      Bitmap.allocPixels(SkImageInfo::Make(width, height,
-                         kN32_SkColorType, kPremul_SkAlphaType));
+      Bitmap.allocPixels(SkImageInfo::Make(width, height, kN32_SkColorType, kPremul_SkAlphaType));
       this->Width = width;
       this->Height = height;
     }
-    // Recreate the surface
-    //this->surface.reset(createSurfaceFromBitmap(Bitmap));
   }  
 
 } // namespace varco

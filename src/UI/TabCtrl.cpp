@@ -1,17 +1,17 @@
+#include <WindowHandling/MainWindow.hpp>
 #include <UI/TabCtrl.hpp>
 #include <Utils/Utils.hpp>
 #include <SkTypeface.h>
 #include <SkGradientShader.h>
+#include <algorithm>
 
 namespace varco {
-
-  static SkRect tabDefaultRect = SkRect::MakeLTRB(0, 0, 150.0, 33.0); // The rect that encloses the tab (coords relative to the tab control)
 
   Tab::Tab(TabCtrl& parent, std::string title) :
     parent(parent),
     title(title)
   {
-    bitmap.allocPixels(SkImageInfo::Make((int)tabDefaultRect.width(), (int)tabDefaultRect.height(), kN32_SkColorType, kPremul_SkAlphaType));
+    resize();
   }
 
   SkBitmap& Tab::getBitmap() {
@@ -24,8 +24,8 @@ namespace varco {
 
   void Tab::setSelected(bool selected) {
     this->selected = selected;
-    dirty = true;
-    parent.dirty = true;
+    this->dirty = true;
+    this->parent.dirty = true;
   }
 
   void Tab::setOffset(SkScalar offset) {
@@ -65,8 +65,8 @@ namespace varco {
 
     SkPaint tabBorderPaint;    
     SkPoint topToBottomPoints[2] = {
-      SkPoint::Make(tabDefaultRect.width() / 2.0f, tabDefaultRect.top()),
-      SkPoint::Make(tabDefaultRect.width() / 2.0f, tabDefaultRect.bottom())
+      SkPoint::Make(this->parent.tabsCurrentRect.width() / 2.0f, this->parent.tabsCurrentRect.top()),
+      SkPoint::Make(this->parent.tabsCurrentRect.width() / 2.0f, this->parent.tabsCurrentRect.bottom())
     };
     if (this->selected == true) {      
       SkColor colors[2] = { SkColorSetARGB(255, 52, 53, 57), SkColorSetARGB(255, 39, 40, 34) };
@@ -77,7 +77,7 @@ namespace varco {
       auto shader = SkGradientShader::MakeLinear(topToBottomPoints, colors, NULL, 2, SkShader::kClamp_TileMode, 0, NULL);
       tabBorderPaint.setShader(shader);
     }
-    SkRect tabRect = SkRect::MakeLTRB(0, 5 /* top padding */, tabDefaultRect.width(), tabDefaultRect.fBottom);
+    SkRect tabRect = SkRect::MakeLTRB(0, 5 /* top padding */, this->parent.tabsCurrentRect.width(), this->parent.tabsCurrentRect.fBottom);
     SkScalar yDistanceBetweenBezierPoints = (tabRect.fBottom - tabRect.fTop) / 4.0f;
 
     path.reset();
@@ -141,7 +141,16 @@ namespace varco {
     canvas.restore();
   }
 
-  TabCtrl::TabCtrl() {
+  void Tab::resize() {
+    bitmap.allocPixels(SkImageInfo::Make( (int)this->parent.tabsCurrentRect.width(),
+                                          (int)this->parent.tabsCurrentRect.height(),
+                                          kN32_SkColorType, kPremul_SkAlphaType) );
+    this->dirty = true;
+  }
+
+  TabCtrl::TabCtrl(MainWindow& parentWindow) :
+    parentWindow(parentWindow)
+  {
     // DEBUG - add some tabs
     tabs.emplace_back(*this, "ALOTOFTEXTALOTOFTEXT");
     tabs.emplace_back(*this, "Second tab");
@@ -153,6 +162,23 @@ namespace varco {
       this->rect = rect;
       this->bitmap.allocPixels(SkImageInfo::Make((int)rect.width(), (int)rect.height(), kN32_SkColorType, kPremul_SkAlphaType));
       dirty = true;
+      recalculateTabsRects();
+    }
+  }
+
+  void TabCtrl::recalculateTabsRects() {
+    if (tabs.size() > 0) {
+      // Calculate how much should a tab be wide if we had to cover the entire control width with the number
+      // of tabs we currently have (and keeping in mind the overlapping among them)
+      auto tabWidth = (this->rect.width() + ((tabs.size() - 1) * tabOverlapSize)) / tabs.size();
+      tabWidth = std::min(std::max(tabWidth, TAB_MIN_WIDTH), TAB_MAX_WIDTH); // Clamp to extremes
+      if (this->tabsCurrentRect.fRight != tabWidth) {
+        this->tabsCurrentRect.fRight = tabWidth;
+        // Every tab has to be resized
+        std::for_each(this->tabs.begin(), this->tabs.end(), [](auto& tab) {
+          tab.resize(); // Also automatically sets the tab as dirty
+        });        
+      }
     }
   }
 
@@ -191,6 +217,8 @@ namespace varco {
     // Render all tabs, but only draw unselected ones
     //////////////////////////////////////////////////////////////////////
 
+    recalculateTabsRects();
+
     SkScalar tabOffset = 0.0f;
     for (auto i = 0; i < tabs.size(); ++i) {
       Tab& tab = tabs[i];
@@ -198,7 +226,7 @@ namespace varco {
       tab.paint(); // Render the tab into its own buffer
       if (i != selectedTab) // The selected one is drawn AFTER all the others
         canvas.drawBitmap(tab.getBitmap(), this->rect.fLeft + tabOffset, this->rect.fTop);
-      tabOffset += tabDefaultRect.width() - 20.0f;      
+      tabOffset += this->tabsCurrentRect.width() - tabOverlapSize;
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -223,7 +251,7 @@ namespace varco {
     canvas.restore();
   }
 
-  bool TabCtrl::onMouseClick(SkScalar x, SkScalar y) {
+  void TabCtrl::onLeftMouseClick(SkScalar x, SkScalar y) {
     
     SkPoint relativeToTabCtrl = SkPoint::Make(x - this->rect.fLeft, y - this->rect.fTop);
     
@@ -233,6 +261,9 @@ namespace varco {
       Tab& tab = tabs[i];
 
       SkPoint relativeToTab = SkPoint::Make(relativeToTabCtrl.x() - tab.getOffset(), relativeToTabCtrl.y());
+
+      if (selectedTab == i)
+        continue; // Left click on the already selected tab triggers nothing
 
       if (tab.getPath().contains(relativeToTab.x(), relativeToTab.y()) == true) {
         redrawNeeded = true;
@@ -245,10 +276,19 @@ namespace varco {
       }
     }
 
-    if (redrawNeeded)
-      return true;
-    else
-      return false;
+    if (redrawNeeded) {
+      this->dirty = true;
+      parentWindow.redraw();
+    }
+  }
+
+  void TabCtrl::addNewTab(std::string title, bool makeSelected) {    
+    if (selectedTab != -1) // Deselect old selected tab
+      tabs[selectedTab].setSelected(false);
+    tabs.emplace_back(*this, title);
+    tabs.back().setSelected(true);
+    selectedTab = tabs.size() - 1;
+    this->parentWindow.redraw();
   }
 
 }

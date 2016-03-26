@@ -21,7 +21,8 @@ namespace varco {
 #endif
 
     void draw(SkCanvas& canvas) override;
-    bool onMouseDown(SkScalar x, SkScalar y) override; // Returns true if a redraw is needed
+    void onLeftMouseDown(SkScalar x, SkScalar y) override;
+    void onKeyDown(VirtualKeycode key) override;
 
   private:
     TabCtrl tabCtrl;

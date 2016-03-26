@@ -1,6 +1,7 @@
 #ifndef VARCO_BASEOSWINDOW_WIN_HPP
 #define VARCO_BASEOSWINDOW_WIN_HPP
 
+#include <Utils/VKeyCodes.hpp>
 #include <SkCanvas.h>
 #include <SkSurface.h>
 #include "windows.h"
@@ -16,9 +17,11 @@ namespace varco {
                  int nCmdShow);
 
     int show();
-
+    
     virtual void draw(SkCanvas& canvas) = 0;
-    virtual bool onMouseDown(SkScalar x, SkScalar y) = 0; // Returns true if a redraw is needed
+    void redraw();
+    virtual void onLeftMouseDown(SkScalar x, SkScalar y) = 0;
+    virtual void onKeyDown(VirtualKeycode key) = 0;
 
   protected:
     HINSTANCE Instance, PrevInstance;

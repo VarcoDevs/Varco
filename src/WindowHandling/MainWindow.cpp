@@ -6,9 +6,9 @@
 namespace varco {
 
 #ifdef _WIN32
-  MainWindow::MainWindow(HINSTANCE hInstance, HINSTANCE hPrevInstance, 
-                         LPSTR lpCmdLine, int nCmdShow)
-    : BaseOSWindow(hInstance, hPrevInstance, lpCmdLine, nCmdShow)
+  MainWindow::MainWindow(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) : 
+    BaseOSWindow(hInstance, hPrevInstance, lpCmdLine, nCmdShow),
+    tabCtrl(*this)
 #elif defined __linux__
   MainWindow::MainWindow(int argc, char **argv)
     : BaseOSWindow(argc, argv)
@@ -32,16 +32,22 @@ namespace varco {
     // ...
   }
 
-
-  bool MainWindow::onMouseDown(SkScalar x, SkScalar y) {
+  void MainWindow::onLeftMouseDown(SkScalar x, SkScalar y) {
 
     // Forward the event to a container control
     if (isPointInsideRect(x, y, tabCtrl.getRect()))
-      return tabCtrl.onMouseClick(x, y);
+      tabCtrl.onLeftMouseClick(x, y);
 
     // [] Other controls' tests should go here
+  }  
 
-    return false;
+  void MainWindow::onKeyDown(VirtualKeycode key) {
+
+    // TODO: every key event should be directed to the code edit control, except Ctrl+ and Alt+ augmented chords
+    
+    // DEBUG
+    if (key == VirtualKeycode::VK_N)
+      tabCtrl.addNewTab("New tab!");
   }
 
 } // namespace varco
