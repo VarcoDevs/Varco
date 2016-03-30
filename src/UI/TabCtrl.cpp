@@ -5,9 +5,11 @@
 #include <SkGradientShader.h>
 #include <algorithm>
 
+#include <sstream> // DEBUG
+
 namespace varco {
 
-  Tab::Tab(TabCtrl& parent, std::string title) :
+  Tab::Tab(TabCtrl *parent, std::string title) :
     parent(parent),
     title(title)
   {
@@ -25,7 +27,7 @@ namespace varco {
   void Tab::setSelected(bool selected) {
     this->selected = selected;
     this->dirty = true;
-    this->parent.dirty = true;
+    this->parent->dirty = true;
   }
 
   void Tab::setOffset(SkScalar offset) {
@@ -34,6 +36,10 @@ namespace varco {
 
   SkScalar Tab::getOffset() {
     return this->parentOffset;
+  }
+
+  SkScalar Tab::getTrackingOffset() {
+    return this->trackingOffset;
   }
 
   void Tab::paint() {
@@ -65,8 +71,8 @@ namespace varco {
 
     SkPaint tabBorderPaint;    
     SkPoint topToBottomPoints[2] = {
-      SkPoint::Make(this->parent.tabsCurrentRect.width() / 2.0f, this->parent.tabsCurrentRect.top()),
-      SkPoint::Make(this->parent.tabsCurrentRect.width() / 2.0f, this->parent.tabsCurrentRect.bottom())
+      SkPoint::Make(this->parent->tabsCurrentRect.width() / 2.0f, this->parent->tabsCurrentRect.top()),
+      SkPoint::Make(this->parent->tabsCurrentRect.width() / 2.0f, this->parent->tabsCurrentRect.bottom())
     };
     if (this->selected == true) {      
       SkColor colors[2] = { SkColorSetARGB(255, 52, 53, 57), SkColorSetARGB(255, 39, 40, 34) };
@@ -77,7 +83,7 @@ namespace varco {
       auto shader = SkGradientShader::MakeLinear(topToBottomPoints, colors, NULL, 2, SkShader::kClamp_TileMode, 0, NULL);
       tabBorderPaint.setShader(shader);
     }
-    SkRect tabRect = SkRect::MakeLTRB(0, 5 /* top padding */, this->parent.tabsCurrentRect.width(), this->parent.tabsCurrentRect.fBottom);
+    SkRect tabRect = SkRect::MakeLTRB(0, 5 /* top padding */, this->parent->tabsCurrentRect.width(), this->parent->tabsCurrentRect.fBottom);
     SkScalar yDistanceBetweenBezierPoints = (tabRect.fBottom - tabRect.fTop) / 4.0f;
 
     path.reset();
@@ -142,8 +148,8 @@ namespace varco {
   }
 
   void Tab::resize() {
-    bitmap.allocPixels(SkImageInfo::Make( (int)this->parent.tabsCurrentRect.width(),
-                                          (int)this->parent.tabsCurrentRect.height(),
+    bitmap.allocPixels(SkImageInfo::Make( (int)this->parent->tabsCurrentRect.width(),
+                                          (int)this->parent->tabsCurrentRect.height(),
                                           kN32_SkColorType, kPremul_SkAlphaType) );
     this->dirty = true;
   }
@@ -152,9 +158,9 @@ namespace varco {
     parentWindow(parentWindow)
   {
     // DEBUG - add some tabs
-    tabs.emplace_back(*this, "ALOTOFTEXTALOTOFTEXT");
-    tabs.emplace_back(*this, "Second tab");
-    tabs.emplace_back(*this, "Third tab");
+    tabs.emplace_back(this, "ALOTOFTEXTALOTOFTEXT");
+    tabs.emplace_back(this, "Second tab");
+    tabs.emplace_back(this, "Third tab");
   }
   
   void TabCtrl::resize(SkRect rect) {
@@ -219,6 +225,31 @@ namespace varco {
 
     recalculateTabsRects();
 
+#define TAB_SAFETY_OFFSET 20.5f
+
+    // Before rendering, check if a tracking is in progress and if a swap is needed
+    SkScalar selectedTabOffset = (selectedTab != -1) ? this->rect.fLeft + tabs[selectedTab].getOffset() + tabs[selectedTab].getTrackingOffset() : 0;
+    if (m_tracking == true && selectedTab != -1) {
+
+      bool swapped = false; // Only one swap (left OR right) is allowed per redraw cycle
+
+      if (selectedTab > 0) { // If there are tabs on the left and..
+        SkScalar leftTabEnd = this->rect.fLeft + tabs[selectedTab - 1].getOffset() + tabs[selectedTab - 1].getTrackingOffset() + tabsCurrentRect.width();
+        if (selectedTabOffset + (tabsCurrentRect.width() / 2.0f) < leftTabEnd - TAB_SAFETY_OFFSET) { // ..if the center of the selected tab is inside another one
+          swapTabs(selectedTab, selectedTab - 1);
+          swapped = true;
+        }
+      }
+
+      if (swapped == false && tabs.size() > selectedTab + 1) { // If there are tabs on the right and..
+        SkScalar rightTabBegin = this->rect.fLeft + tabs[selectedTab + 1].getOffset() + tabs[selectedTab + 1].getTrackingOffset();
+        if (selectedTabOffset + (tabsCurrentRect.width() / 2.0f) > rightTabBegin + TAB_SAFETY_OFFSET) { // ..if the center of the selected tab is inside another one
+          swapTabs(selectedTab, selectedTab + 1);
+        }
+      }
+
+    }
+
     SkScalar tabOffset = 0.0f;
     for (auto i = 0; i < tabs.size(); ++i) {
       Tab& tab = tabs[i];
@@ -242,8 +273,11 @@ namespace varco {
     //////////////////////////////////////////////////////////////////////
     // Now if there's a selected one, draw it last
     //////////////////////////////////////////////////////////////////////
-    if (selectedTab != -1)
-      canvas.drawBitmap(tabs[selectedTab].getBitmap(), this->rect.fLeft + tabs[selectedTab].getOffset(), this->rect.fTop);
+    if (selectedTab != -1) {
+      // Recalculate selected tab offset (there might have been a swap)
+      selectedTabOffset = this->rect.fLeft + tabs[selectedTab].getOffset() + tabs[selectedTab].getTrackingOffset();
+      canvas.drawBitmap(tabs[selectedTab].getBitmap(), selectedTabOffset, this->rect.fTop);
+    }
 
     canvas.flush();
     dirty = false;
@@ -251,7 +285,29 @@ namespace varco {
     canvas.restore();
   }
 
-  void TabCtrl::onLeftMouseClick(SkScalar x, SkScalar y) {
+  void TabCtrl::swapTabs(size_t tab1, size_t tab2) {
+
+    // Adjust selected tab index and tracking offsets
+    auto slideOffset = tabsCurrentRect.width() - tabOverlapSize;
+    if (selectedTab == tab1 && tab1 < tab2) {
+      m_startXTrackingPosition += slideOffset;
+      tabs[selectedTab].trackingOffset -= slideOffset;
+    } else {
+      m_startXTrackingPosition -= slideOffset;
+      tabs[selectedTab].trackingOffset += slideOffset;
+    }
+
+    //OutputDebugString("SWAPPING!!!");
+
+    std::swap(tabs[tab1], tabs[tab2]);
+    
+    if (selectedTab == tab1)
+      selectedTab = tab2;      
+    else if (selectedTab == tab2)
+      selectedTab = tab1;
+  }
+
+  void TabCtrl::onLeftMouseDown(SkScalar x, SkScalar y) {
     
     SkPoint relativeToTabCtrl = SkPoint::Make(x - this->rect.fLeft, y - this->rect.fTop);
     
@@ -262,17 +318,21 @@ namespace varco {
 
       SkPoint relativeToTab = SkPoint::Make(relativeToTabCtrl.x() - tab.getOffset(), relativeToTabCtrl.y());
 
-      if (selectedTab == i)
-        continue; // Left click on the already selected tab triggers nothing
-
       if (tab.getPath().contains(relativeToTab.x(), relativeToTab.y()) == true) {
-        redrawNeeded = true;
 
-        if (selectedTab != -1) // Deselect old selected tab
-          tabs[selectedTab].setSelected(false);
+        if (selectedTab != i) { // Left click on the already selected tab won't trigger a "selected check"          
+          redrawNeeded = true;
 
-        selectedTab = i;
-        tab.setSelected(true);
+          if (selectedTab != -1) // Deselect old selected tab
+            tabs[selectedTab].setSelected(false);
+
+          selectedTab = i;
+          tab.setSelected(true);
+        }
+        
+        m_tracking = true;
+        m_startXTrackingPosition = x;
+        parentWindow.startMouseCapture();
       }
     }
 
@@ -282,13 +342,40 @@ namespace varco {
     }
   }
 
+  void TabCtrl::onLeftMouseMove(SkScalar x, SkScalar y) {
+    if (!m_tracking)
+      return;
+
+    tabs[selectedTab].trackingOffset = x - m_startXTrackingPosition;
+    tabs[selectedTab].dirty = true;
+    this->dirty = true;
+    parentWindow.redraw();
+  }
+
+  void TabCtrl::onLeftMouseUp(SkScalar x, SkScalar y) {
+    stopTracking();
+  }
+
   void TabCtrl::addNewTab(std::string title, bool makeSelected) {    
     if (selectedTab != -1) // Deselect old selected tab
       tabs[selectedTab].setSelected(false);
-    tabs.emplace_back(*this, title);
+    tabs.emplace_back(this, title);
     tabs.back().setSelected(true);
     selectedTab = tabs.size() - 1;
     this->parentWindow.redraw();
+  }
+
+  bool TabCtrl::isTrackingActive() {
+    return m_tracking;
+  }
+
+  void TabCtrl::stopTracking() {
+    OutputDebugString("STOP TRACKING");
+    m_tracking = false;
+    tabs[selectedTab].trackingOffset = 0.0f;
+    tabs[selectedTab].dirty = true;
+    this->dirty = true;
+    parentWindow.redraw();
   }
 
 }

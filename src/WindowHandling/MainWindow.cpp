@@ -36,10 +36,35 @@ namespace varco {
 
     // Forward the event to a container control
     if (isPointInsideRect(x, y, tabCtrl.getRect()))
-      tabCtrl.onLeftMouseClick(x, y);
+      tabCtrl.onLeftMouseDown(x, y);
 
     // [] Other controls' tests should go here
-  }  
+  }
+
+  void MainWindow::onLeftMouseMove(SkScalar x, SkScalar y) {
+
+    // Forward the event to a container control
+    if (isPointInsideRect(x, y, tabCtrl.getRect()))
+      tabCtrl.onLeftMouseMove(x, y);
+    else if (tabCtrl.isTrackingActive() == true)
+      tabCtrl.stopTracking();
+
+    // [] Other controls' tests should go here
+  }
+
+  void MainWindow::onMouseLeave() {
+    if (tabCtrl.isTrackingActive() == true)
+      tabCtrl.stopTracking();
+  }
+
+  void MainWindow::onLeftMouseUp(SkScalar x, SkScalar y) {
+
+    // Forward the event to a container control
+    if (isPointInsideRect(x, y, tabCtrl.getRect()))
+      tabCtrl.onLeftMouseUp(x, y);    
+
+    // [] Other controls' tests should go here
+  }
 
   void MainWindow::onKeyDown(VirtualKeycode key) {
 

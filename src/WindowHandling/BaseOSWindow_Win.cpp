@@ -144,7 +144,21 @@ namespace varco {
       } break;
 
       case WM_MOUSEMOVE: {
-      
+        if (wParam & MK_LBUTTON) { // Left mouse is down
+          auto x = LOWORD(lParam);
+          auto y = HIWORD(lParam);
+          this->onLeftMouseMove(x, y);
+        }
+      } break;
+
+      case WM_MOUSELEAVE: {
+        this->onMouseLeave();
+      } break;
+
+      case WM_LBUTTONUP: {
+        auto x = LOWORD(lParam);
+        auto y = HIWORD(lParam);
+        this->onLeftMouseUp(x, y);
       } break;
 
       case WM_SIZE: {
@@ -176,6 +190,14 @@ namespace varco {
 
     }
     return DefWindowProc(hWnd, message, wParam, lParam);
+  }
+
+  void BaseOSWindow::startMouseCapture() { // Track the mouse to be notified when it leaves the client area
+    TRACKMOUSEEVENT tme;
+    tme.cbSize = sizeof(TRACKMOUSEEVENT);
+    tme.dwFlags = TME_LEAVE;
+    tme.hwndTrack = this->hWnd;
+    TrackMouseEvent(&tme);
   }
 
   void BaseOSWindow::redraw() {

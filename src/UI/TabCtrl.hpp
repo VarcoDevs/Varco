@@ -16,7 +16,7 @@ namespace varco {
   class Tab { // Represents a tab inside the tab control
     friend class TabCtrl;
   public:
-    Tab(TabCtrl& parent, std::string title);
+    Tab(TabCtrl *parent, std::string title);
 
     // Paint the tab into its own bitmap
     void paint();
@@ -26,14 +26,16 @@ namespace varco {
     void setSelected(bool);
     void setOffset(SkScalar);
     SkScalar getOffset();
+    SkScalar getTrackingOffset();
 
   private:
-    TabCtrl& parent;
+    TabCtrl *parent;
     std::string title;
     SkBitmap bitmap; // The tab will be rendered here
     bool dirty = true;
     SkPath path; // The path where clicks and inputs are accepted
     SkScalar parentOffset; // The offset from the start of the parent tab control
+    SkScalar trackingOffset = 0.0f; // The additional offset due to tracking
     bool selected = false; // Is this a selected tab?
   };
 
@@ -51,8 +53,13 @@ namespace varco {
     SkBitmap& getBitmap();
     SkRect getRect();
     void paint(); // Paint the control in the bitmap
-    void onLeftMouseClick(SkScalar x, SkScalar y);
+    void onLeftMouseDown(SkScalar x, SkScalar y);
+    void onLeftMouseMove(SkScalar x, SkScalar y);
+    void onLeftMouseUp(SkScalar x, SkScalar y);
     void addNewTab(std::string title, bool makeSelected = true); // TODO: return unique id!
+
+    bool isTrackingActive();
+    void stopTracking();
 
   private:
     MainWindow& parentWindow;
@@ -62,7 +69,12 @@ namespace varco {
     std::vector<Tab> tabs;
     size_t selectedTab = -1; // The index of the selected tab
 
-    void recalculateTabsRects();
+    // Tracking section
+    bool m_tracking = false; // Whether a tab is being tracked (dragged)
+    SkScalar m_startXTrackingPosition;
+    void swapTabs(size_t tab1, size_t tab2);
+
+    void recalculateTabsRects(); // Recalculates all the tabs rects (e.g. shrinks them in case the window got smaller)
   };
 }
 
