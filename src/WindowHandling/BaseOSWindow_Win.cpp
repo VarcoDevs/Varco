@@ -185,7 +185,7 @@ namespace varco {
         this->paint(hdc, false);
 
         EndPaint(hWnd, &ps);
-        return 1; // Completely handled
+        return 0; // Completely handled
       } break;
 
     }
@@ -245,7 +245,8 @@ namespace varco {
 
     SelectObject(hdcMem, oldBmp);
 
-    ReleaseDC(hWnd, hdcMem);
+    DeleteDC(hdcMem);
+    DeleteObject(bmp);
   }
 
   void BaseOSWindow::resize(int width, int height) {

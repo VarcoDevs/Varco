@@ -9,6 +9,8 @@
 
 namespace varco {
 
+  static const float movementSpeed = 0.5f;
+
   Tab::Tab(TabCtrl *parent, std::string title) :
     parent(parent),
     title(title)
@@ -36,6 +38,10 @@ namespace varco {
 
   SkScalar Tab::getOffset() {
     return this->parentOffset;
+  }
+
+  SkScalar Tab::getMovementOffset() {
+    return this->movementOffset;
   }
 
   SkScalar Tab::getTrackingOffset() {
@@ -188,6 +194,33 @@ namespace varco {
     }
   }
 
+  bool TabCtrl::getAndDecreaseMovementOffsetForTab(size_t tab, SkScalar& movement) {
+    movement = tabs[tab].getMovementOffset();
+    if (movement != 0.f) {
+      // Decrease movement offset over time
+      auto now = std::chrono::system_clock::now();
+      auto elapsedSeconds = now - tabs[tab].lastMovementTime;
+      auto subtrahend = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedSeconds).count() * movementSpeed;
+      if (movement >= 0.f) {
+        movement = std::max(
+          movement - subtrahend,
+          0.0f
+          );
+      }
+      else {
+        movement = std::min(
+          movement + subtrahend,
+          0.0f
+          );
+      }
+
+      tabs[tab].movementOffset = movement;
+      tabs[tab].lastMovementTime = now;
+      return true; // Also needs a redraw
+    }
+    return false;
+  }
+
   SkBitmap& TabCtrl::getBitmap() {
     return this->bitmap;
   }
@@ -200,6 +233,8 @@ namespace varco {
 
     if (!dirty)
       return;
+
+    dirty = false; // It will be false at the end of this function, unless overridden
 
     SkCanvas canvas(this->bitmap);
 
@@ -225,7 +260,7 @@ namespace varco {
 
     recalculateTabsRects();
 
-#define TAB_SAFETY_OFFSET 20.5f
+#define TAB_SAFETY_OFFSET 20.5f // A safety offset from the swap point to prevent swap left-right fighting
 
     // Before rendering, check if a tracking is in progress and if a swap is needed
     SkScalar selectedTabOffset = (selectedTab != -1) ? this->rect.fLeft + tabs[selectedTab].getOffset() + tabs[selectedTab].getTrackingOffset() : 0;
@@ -253,10 +288,19 @@ namespace varco {
     SkScalar tabOffset = 0.0f;
     for (auto i = 0; i < tabs.size(); ++i) {
       Tab& tab = tabs[i];
-      tab.setOffset(tabOffset);      
+      tab.setOffset(tabOffset);
+      auto tabOffsetWithMovement = tabOffset;
+      if (i != selectedTab) { // Selected one is special and is tracked
+        SkScalar movementOffset = 0.f;
+        auto needRedraw = getAndDecreaseMovementOffsetForTab(i, movementOffset);
+        if (movementOffset != 0.0f)
+          tabOffsetWithMovement += movementOffset;
+        if (needRedraw)
+          dirty = true;
+      }
       tab.paint(); // Render the tab into its own buffer
       if (i != selectedTab) // The selected one is drawn AFTER all the others
-        canvas.drawBitmap(tab.getBitmap(), this->rect.fLeft + tabOffset, this->rect.fTop);
+        canvas.drawBitmap(tab.getBitmap(), this->rect.fLeft + tabOffsetWithMovement, this->rect.fTop);
       tabOffset += this->tabsCurrentRect.width() - tabOverlapSize;
     }
 
@@ -275,29 +319,51 @@ namespace varco {
     //////////////////////////////////////////////////////////////////////
     if (selectedTab != -1) {
       // Recalculate selected tab offset (there might have been a swap)
-      selectedTabOffset = this->rect.fLeft + tabs[selectedTab].getOffset() + tabs[selectedTab].getTrackingOffset();
+      auto movementOrTrackingOffset = 0.0f;
+      if (m_tracking == true)
+        movementOrTrackingOffset = tabs[selectedTab].getTrackingOffset();
+      else {
+        auto needRedraw = getAndDecreaseMovementOffsetForTab(selectedTab, movementOrTrackingOffset);
+        if (needRedraw)
+          dirty = true;
+      }
+
+      selectedTabOffset = this->rect.fLeft + tabs[selectedTab].getOffset() + movementOrTrackingOffset;
       canvas.drawBitmap(tabs[selectedTab].getBitmap(), selectedTabOffset, this->rect.fTop);
     }
 
     canvas.flush();
-    dirty = false;
-
     canvas.restore();
+
+    if (dirty == true)
+      parentWindow.redraw(); // Schedule a redraw
   }
 
   void TabCtrl::swapTabs(size_t tab1, size_t tab2) {
 
-    // Adjust selected tab index and tracking offsets
+    // Adjust selected tab index and tracking offsets / movement offsets
     auto slideOffset = tabsCurrentRect.width() - tabOverlapSize;
-    if (selectedTab == tab1 && tab1 < tab2) {
+    size_t unselectedTab = (selectedTab == tab1 ? tab2 : tab1);
+    // Swapped with a right unselected
+    if (selectedTab == tab1 && tab1 < tab2 || selectedTab == tab2 && tab2 < tab1) {
+
       m_startXTrackingPosition += slideOffset;
       tabs[selectedTab].trackingOffset -= slideOffset;
-    } else {
+
+      // Transfer the previous position for the unselected tab in movement offset (accumulate on it)
+      tabs[unselectedTab].movementOffset += tabs[unselectedTab].getOffset() - tabs[selectedTab].getOffset();
+      tabs[unselectedTab].lastMovementTime = std::chrono::system_clock::now();
+
+    } else { // swapped with a left unselected
+
       m_startXTrackingPosition -= slideOffset;
       tabs[selectedTab].trackingOffset += slideOffset;
-    }
 
-    //OutputDebugString("SWAPPING!!!");
+      // Transfer the previous position for the unselected tab in movement offset (accumulate on it)
+      tabs[unselectedTab].movementOffset += tabs[unselectedTab].getOffset() - tabs[selectedTab].getOffset();
+      tabs[unselectedTab].lastMovementTime = std::chrono::system_clock::now();
+
+    }
 
     std::swap(tabs[tab1], tabs[tab2]);
     
@@ -370,9 +436,15 @@ namespace varco {
   }
 
   void TabCtrl::stopTracking() {
-    OutputDebugString("STOP TRACKING");
+    OutputDebugString("STOP TRACKING - back to home position");
     m_tracking = false;
+
+    // Transfer the current tracking offset in movement offset (accumulate on it)
+    tabs[selectedTab].movementOffset += tabs[selectedTab].trackingOffset;
+    tabs[selectedTab].lastMovementTime = std::chrono::system_clock::now();
+
     tabs[selectedTab].trackingOffset = 0.0f;
+
     tabs[selectedTab].dirty = true;
     this->dirty = true;
     parentWindow.redraw();

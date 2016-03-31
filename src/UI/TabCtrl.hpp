@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <chrono>
 
 namespace varco {
 
@@ -26,6 +27,7 @@ namespace varco {
     void setSelected(bool);
     void setOffset(SkScalar);
     SkScalar getOffset();
+    SkScalar getMovementOffset();
     SkScalar getTrackingOffset();
 
   private:
@@ -35,6 +37,9 @@ namespace varco {
     bool dirty = true;
     SkPath path; // The path where clicks and inputs are accepted
     SkScalar parentOffset; // The offset from the start of the parent tab control
+    SkScalar movementOffset = 0.0; // A movement offset that decreases over time to reach
+                                   // the parentOffset stationary value
+    std::chrono::time_point<std::chrono::system_clock> lastMovementTime;
     SkScalar trackingOffset = 0.0f; // The additional offset due to tracking
     bool selected = false; // Is this a selected tab?
   };
@@ -75,6 +80,8 @@ namespace varco {
     void swapTabs(size_t tab1, size_t tab2);
 
     void recalculateTabsRects(); // Recalculates all the tabs rects (e.g. shrinks them in case the window got smaller)
+    // Return true if the control needs redrawing
+    bool getAndDecreaseMovementOffsetForTab(size_t tab, SkScalar& movement);
   };
 }
 
