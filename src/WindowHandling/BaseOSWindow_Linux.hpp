@@ -4,8 +4,9 @@
 #include <GL/glx.h>
 #include <X11/Xlib.h>
 
-#include "SkCanvas.h"
-#include "SkSurface.h"
+#include <Utils/VKeyCodes.hpp>
+#include <SkCanvas.h>
+#include <SkSurface.h>
 
 namespace varco {
 
@@ -17,13 +18,20 @@ namespace varco {
     int show();
 
     virtual void draw(SkCanvas& canvas) = 0;
-    virtual bool onMouseDown(SkScalar x, SkScalar y) = 0;
+    void redraw();
+    virtual void onLeftMouseDown(SkScalar x, SkScalar y) = 0;
+    virtual void onLeftMouseMove(SkScalar x, SkScalar y) = 0;
+    void startMouseCapture();
+    virtual void onMouseLeave() = 0;
+    virtual void onLeftMouseUp(SkScalar x, SkScalar y) = 0;
+    virtual void onKeyDown(VirtualKeycode key) = 0;
 
   protected:
     int Argc;
     char **Argv;
     int Width, Height;
-    SkBitmap Bitmap;
+    SkBitmap Bitmap;    
+    XImage image; // XImage associated with the bitmap
     
     Display *fDisplay = nullptr;    
     XVisualInfo *fVi  = nullptr; // VisualInfo structure for GL

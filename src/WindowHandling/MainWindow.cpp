@@ -8,11 +8,11 @@ namespace varco {
 #ifdef _WIN32
   MainWindow::MainWindow(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) : 
     BaseOSWindow(hInstance, hPrevInstance, lpCmdLine, nCmdShow),
-    tabCtrl(*this)
 #elif defined __linux__
   MainWindow::MainWindow(int argc, char **argv)
-    : BaseOSWindow(argc, argv)
+    : BaseOSWindow(argc, argv),
 #endif
+      tabCtrl(*this)
   {}
 
   // Main window drawing entry point

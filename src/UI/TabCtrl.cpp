@@ -436,7 +436,7 @@ namespace varco {
   }
 
   void TabCtrl::stopTracking() {
-    OutputDebugString("STOP TRACKING - back to home position");
+    //OutputDebugString("STOP TRACKING - back to home position");
     m_tracking = false;
 
     // Transfer the current tracking offset in movement offset (accumulate on it)
