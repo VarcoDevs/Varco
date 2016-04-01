@@ -7,6 +7,8 @@
 #include <Utils/VKeyCodes.hpp>
 #include <SkCanvas.h>
 #include <SkSurface.h>
+#include <chrono>
+#include <thread>
 
 namespace varco {
 
@@ -30,8 +32,8 @@ namespace varco {
     int Argc;
     char **Argv;
     int Width, Height;
-    SkBitmap Bitmap;    
-    XImage image; // XImage associated with the bitmap
+    SkBitmap Bitmap;
+    GLXContext fGLContext;
     
     Display *fDisplay = nullptr;    
     XVisualInfo *fVi  = nullptr; // VisualInfo structure for GL
@@ -41,6 +43,10 @@ namespace varco {
   private:
 
     void mapWindowAndWait();
+    void invalidateWindow();
+    std::chrono::time_point<std::chrono::system_clock> lastExposeEventTime;
+    std::unique_ptr<std::thread> redrawThread;
+    bool fNeedDraw = true;
     bool wndProc(XEvent *evt); // Returns false to exit the loop
     void resize(int width, int height);
     void paint();

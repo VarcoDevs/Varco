@@ -9,7 +9,7 @@
 
 namespace varco {
 
-  static const float movementSpeed = 0.5f;
+  static const float movementSpeed = 2.5f;
 
   Tab::Tab(TabCtrl *parent, std::string title) :
     parent(parent),
@@ -199,8 +199,8 @@ namespace varco {
     if (movement != 0.f) {
       // Decrease movement offset over time
       auto now = std::chrono::system_clock::now();
-      auto elapsedSeconds = now - tabs[tab].lastMovementTime;
-      auto subtrahend = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedSeconds).count() * movementSpeed;
+      auto elapsedInterval = now - tabs[tab].lastMovementTime;
+      auto subtrahend = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count() * movementSpeed;
       if (movement >= 0.f) {
         movement = std::max(
           movement - subtrahend,
