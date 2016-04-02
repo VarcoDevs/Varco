@@ -9,7 +9,8 @@
 
 namespace varco {
 
-  static const float movementSpeed = 2.5f;
+  static const float movementMilliseconds = 200.f; // Every tab movement to home position takes
+                                                   // this amount of milliseconds
 
   Tab::Tab(TabCtrl *parent, std::string title) :
     parent(parent),
@@ -199,23 +200,16 @@ namespace varco {
     if (movement != 0.f) {
       // Decrease movement offset over time
       auto now = std::chrono::system_clock::now();
-      auto elapsedInterval = now - tabs[tab].lastMovementTime;
-      auto subtrahend = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count() * movementSpeed;
-      if (movement >= 0.f) {
-        movement = std::max(
-          movement - subtrahend,
-          0.0f
-          );
+      auto timeFromStart = now - tabs[tab].firstMovementTime;
+      // Force the amount of movement to complete in 'movementMilliseconds' ms
+      auto timeFromStartInMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeFromStart).count();      
+      if (timeFromStartInMs >= movementMilliseconds) {
+        tabs[tab].movementOffset = 0;
+        movement = 0;
+      } else {
+        auto amount = timeFromStartInMs / static_cast<float>(movementMilliseconds);
+        movement -= movement * amount;
       }
-      else {
-        movement = std::min(
-          movement + subtrahend,
-          0.0f
-          );
-      }
-
-      tabs[tab].movementOffset = movement;
-      tabs[tab].lastMovementTime = now;
       return true; // Also needs a redraw
     }
     return false;
@@ -293,7 +287,7 @@ namespace varco {
       if (i != selectedTab) { // Selected one is special and is tracked
         SkScalar movementOffset = 0.f;
         auto needRedraw = getAndDecreaseMovementOffsetForTab(i, movementOffset);
-        if (movementOffset != 0.0f)
+        if (movementOffset != 0)
           tabOffsetWithMovement += movementOffset;
         if (needRedraw)
           dirty = true;
@@ -352,7 +346,7 @@ namespace varco {
 
       // Transfer the previous position for the unselected tab in movement offset (accumulate on it)
       tabs[unselectedTab].movementOffset += tabs[unselectedTab].getOffset() - tabs[selectedTab].getOffset();
-      tabs[unselectedTab].lastMovementTime = std::chrono::system_clock::now();
+      tabs[unselectedTab].firstMovementTime = std::chrono::system_clock::now();
 
     } else { // swapped with a left unselected
 
@@ -361,7 +355,7 @@ namespace varco {
 
       // Transfer the previous position for the unselected tab in movement offset (accumulate on it)
       tabs[unselectedTab].movementOffset += tabs[unselectedTab].getOffset() - tabs[selectedTab].getOffset();
-      tabs[unselectedTab].lastMovementTime = std::chrono::system_clock::now();
+      tabs[unselectedTab].firstMovementTime = std::chrono::system_clock::now();
 
     }
 
@@ -385,6 +379,9 @@ namespace varco {
       SkPoint relativeToTab = SkPoint::Make(relativeToTabCtrl.x() - tab.getOffset(), relativeToTabCtrl.y());
 
       if (tab.getPath().contains(relativeToTab.x(), relativeToTab.y()) == true) {
+
+        if (tab.getMovementOffset() != 0)
+          return; // No dragging when returning to home position
 
         if (selectedTab != i) { // Left click on the already selected tab won't trigger a "selected check"          
           redrawNeeded = true;
@@ -441,7 +438,7 @@ namespace varco {
 
     // Transfer the current tracking offset in movement offset (accumulate on it)
     tabs[selectedTab].movementOffset += tabs[selectedTab].trackingOffset;
-    tabs[selectedTab].lastMovementTime = std::chrono::system_clock::now();
+    tabs[selectedTab].firstMovementTime = std::chrono::system_clock::now();
 
     tabs[selectedTab].trackingOffset = 0.0f;
 

@@ -166,13 +166,21 @@ namespace varco {
         auto height = HIWORD(lParam);
         this->resize(width, height);
 
-        InvalidateRect(hWnd, NULL, 0);
+        redraw();
       } break;
 
       case WM_PAINT: {
 
+        /*MSG msg;
+        while (PeekMessage(&msg, hWnd, 0, 0, PM_QS_PAINT)) {
+        }*/
+
         if (!(Width > 0 && Height > 0))
           return 1; // Nonsense painting a 0 area
+        else {
+          if (Width != Bitmap.width() || Height != Bitmap.height())
+            Bitmap.allocPixels(SkImageInfo::Make(Width, Height, kN32_SkColorType, kPremul_SkAlphaType));
+        }
 
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
@@ -185,7 +193,9 @@ namespace varco {
         this->paint(hdc, false);
 
         EndPaint(hWnd, &ps);
+
         return 0; // Completely handled
+
       } break;
 
     }
@@ -250,11 +260,8 @@ namespace varco {
   }
 
   void BaseOSWindow::resize(int width, int height) {
-    if (width != Bitmap.width() || height != Bitmap.height()) {
-      Bitmap.allocPixels(SkImageInfo::Make(width, height, kN32_SkColorType, kPremul_SkAlphaType));
-      this->Width = width;
-      this->Height = height;
-    }
+    this->Width = width;
+    this->Height = height;    
   }  
 
 } // namespace varco

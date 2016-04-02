@@ -39,7 +39,7 @@ namespace varco {
     SkScalar parentOffset; // The offset from the start of the parent tab control
     SkScalar movementOffset = 0.0; // A movement offset that decreases over time to reach
                                    // the parentOffset stationary value
-    std::chrono::time_point<std::chrono::system_clock> lastMovementTime;
+    std::chrono::time_point<std::chrono::system_clock> firstMovementTime;
     SkScalar trackingOffset = 0.0f; // The additional offset due to tracking
     bool selected = false; // Is this a selected tab?
   };
