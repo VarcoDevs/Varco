@@ -104,6 +104,7 @@ list (APPEND SRCS ${UI_SRCS})
 source_group (UI FILES ${UI_SRCS})
 
 set (UTILS_SRCS
+            src/Utils/Commons.hpp
             src/Utils/Utils.hpp
             src/Utils/VKeyCodes.hpp)
 list (APPEND SRCS ${UTILS_SRCS})

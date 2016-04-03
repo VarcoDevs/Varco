@@ -4,11 +4,17 @@
 #include <GL/glx.h>
 #include <X11/Xlib.h>
 
+#include <Utils/Commons.hpp>
 #include <Utils/VKeyCodes.hpp>
 #include <SkCanvas.h>
 #include <SkSurface.h>
+#include <SkSurfaceProps.h>
 #include <chrono>
 #include <thread>
+
+class GrContext;
+struct GrGLInterface;
+class GrRenderTarget;
 
 namespace varco {
 
@@ -16,6 +22,7 @@ namespace varco {
   public:
 
     BaseOSWindow(int argc, char **argv);
+    virtual ~BaseOSWindow();
 
     int show();
 
@@ -32,13 +39,23 @@ namespace varco {
     int Argc;
     char **Argv;
     int Width, Height;
-    SkBitmap Bitmap;
-    GLXContext fGLContext;
+    SkBitmap Bitmap;    
     
     Display *fDisplay = nullptr;    
     XVisualInfo *fVi  = nullptr; // VisualInfo structure for GL
+    int fMSAASampleCount;
     Window fWin;
     GC fGc; // Graphic context
+    GLXContext fGLContext;
+
+    std::unique_ptr<SkSurface> fSurface;
+    std::unique_ptr<const SkSurfaceProps> fSurfaceProps;
+    GrContext* fContext;
+    GrRenderTarget* fRenderTarget;
+    AttachmentInfo fAttachmentInfo;
+    const int requestedMSAASampleCount = 0; // Modify this to increase MSAA
+    const GrGLInterface* fInterface;
+    GrRenderTarget* setupRenderTarget();
 
   private:
 

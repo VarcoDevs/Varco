@@ -3,7 +3,11 @@
 #include <X11/Xatom.h>
 #include <X11/XKBlib.h>
 
-#include "SkEvent.h"
+#include <SkEvent.h>
+#include <gl/GrGLInterface.h>
+#include <gl/GrGLUtil.h>
+#include <GrContext.h>
+//#include <SkGr.h>
 
 namespace varco {
 
@@ -30,7 +34,30 @@ namespace varco {
       None
     };
     
-    fVi = glXChooseVisual(fDisplay, DefaultScreen(fDisplay), att);
+    if (requestedMSAASampleCount > 0) {
+      static const GLint kAttCount = SK_ARRAY_COUNT(att);
+      GLint msaaAtt[kAttCount + 4];
+      memcpy(msaaAtt, att, sizeof(att));
+      SkASSERT(None == msaaAtt[kAttCount - 1]);
+      msaaAtt[kAttCount - 1] = GLX_SAMPLE_BUFFERS_ARB;
+      msaaAtt[kAttCount + 0] = 1;
+      msaaAtt[kAttCount + 1] = GLX_SAMPLES_ARB;
+      msaaAtt[kAttCount + 2] = requestedMSAASampleCount;
+      msaaAtt[kAttCount + 3] = None;
+      fVi = glXChooseVisual(fDisplay, DefaultScreen(fDisplay), msaaAtt);
+      fMSAASampleCount = requestedMSAASampleCount;
+    }
+    if (fVi == nullptr) {
+      fVi = glXChooseVisual(fDisplay, DefaultScreen(fDisplay), att);
+      fMSAASampleCount = 0;
+    }
+
+    if (fVi == nullptr)
+      throw std::runtime_error("Could not get a XVisualInfo structure");
+
+    glXGetConfig(fDisplay, fVi, GLX_SAMPLES_ARB, &fAttachmentInfo.fSampleCount);
+    glXGetConfig(fDisplay, fVi, GLX_STENCIL_SIZE, &fAttachmentInfo.fStencilBits);
+
     
     Colormap colorMap = XCreateColormap(fDisplay,
                                         RootWindow(fDisplay, fVi->screen),
@@ -55,7 +82,55 @@ namespace varco {
     mapWindowAndWait();
     fGc = XCreateGC(fDisplay, fWin, 0, nullptr);
 
-    this->resize(Width, Height);
+    // OpenGL initialization
+    fGLContext = glXCreateContext(fDisplay, fVi, nullptr, GL_TRUE);
+    if (fGLContext == nullptr)
+      throw std::runtime_error("Could not create an OpenGL context");
+
+    auto res = glXMakeCurrent(fDisplay, fWin, fGLContext);
+    if (res == false)
+      throw std::runtime_error("Could not attach OpenGL context");
+    glViewport(0, 0,
+                    SkScalarRoundToInt(Width),
+                    SkScalarRoundToInt(Height));
+    glClearColor(0, 0, 0, 255);
+    glClearStencil(0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+    fInterface = GrGLCreateNativeInterface();
+    if (fInterface == nullptr)
+      throw std::runtime_error("Could not create an OpenGL backend native interface");
+
+    fContext = GrContext::Create(kOpenGL_GrBackend, (GrBackendContext)fInterface);
+    if (fContext == nullptr)
+      throw std::runtime_error("Could not create an OpenGL backend");
+
+    fSurfaceProps = std::make_unique<const SkSurfaceProps>(SkSurfaceProps::kLegacyFontHost_InitType);
+    fRenderTarget = setupRenderTarget(); // uses current width and height
+    fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+  }
+
+  BaseOSWindow::~BaseOSWindow() {
+    glXMakeCurrent(fDisplay, None, nullptr);
+    glXDestroyContext(fDisplay, fGLContext);
+  }
+
+  GrRenderTarget* BaseOSWindow::setupRenderTarget() {
+    GrBackendRenderTargetDesc desc;
+    desc.fWidth = SkScalarRoundToInt(Width);
+    desc.fHeight = SkScalarRoundToInt(Height);
+    desc.fConfig = fContext->caps()->srgbSupport() &&
+                   (Bitmap.info().profileType() == kSRGB_SkColorProfileType ||
+                    Bitmap.info().colorType() == kRGBA_F16_SkColorType)
+        ? kSkiaGamma8888_GrPixelConfig
+        : kSkia8888_GrPixelConfig;
+    desc.fOrigin = kBottomLeft_GrSurfaceOrigin;
+    desc.fSampleCnt = fAttachmentInfo.fSampleCount;
+    desc.fStencilBits = fAttachmentInfo.fStencilBits;
+    GrGLint buffer;
+    GR_GL_GetIntegerv(fInterface, GR_GL_FRAMEBUFFER_BINDING, &buffer);
+    desc.fRenderTargetHandle = buffer;
+    return fContext->textureProvider()->wrapBackendRenderTarget(desc);
   }
 
   void BaseOSWindow::mapWindowAndWait() {
@@ -77,6 +152,8 @@ namespace varco {
   void BaseOSWindow::resize(int width, int height) {
     this->Width = width;
     this->Height = height;
+    fRenderTarget = setupRenderTarget(); // render target has to be reset
+    fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
   }
 
   static Atom wm_delete_window_message;
@@ -132,25 +209,36 @@ namespace varco {
         if (evt->xexpose.count == 0) { // Only handle the LAST expose redraw event
                                        // if there are multiple ones
 
+          bool resizePending = false;
           while (XCheckTypedWindowEvent(fDisplay, fWin, ConfigureNotify, evt)) {
-            this->resize(evt->xconfigure.width, evt->xconfigure.height);
+              this->Width = evt->xconfigure.width;
+              this->Height = evt->xconfigure.height;
+              resizePending = true;
           }
+          if (resizePending)
+            this->resize(this->Width, this->Height);
 
-          while (XCheckTypedWindowEvent(fDisplay, fWin, Expose, evt));
+          //while (XCheckTypedWindowEvent(fDisplay, fWin, Expose, evt));
 
           if (!(Width > 0 && Height > 0))
             return 1; // Nonsense painting a 0 area
-          else {
-            // A resize might have occurred since last time
-            if (Width != Bitmap.width() || Height != Bitmap.height())
-              Bitmap.allocPixels(SkImageInfo::Make(Width, Height,
-                                                   kN32_SkColorType,
-                                                   kPremul_SkAlphaType));
-          }
+//          else {
+//            // A resize might have occurred since last time
+////            if (Width != Bitmap.width() || Height != Bitmap.height()) {
+//////              Bitmap.allocPixels(SkImageInfo::Make(Width, Height,
+//////                                                   kN32_SkColorType,
+//////                                                   kPremul_SkAlphaType));
+////                glViewport(0, 0,
+////                                SkScalarRoundToInt(Width),
+////                                SkScalarRoundToInt(Height));
+////              fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget,
+////                                                               fSurfaceProps.get()).release());
+////            }
+//          }
 
           // Call the OS-independent draw function
-          SkCanvas canvas(this->Bitmap);
-          this->draw(canvas);
+          auto surfacePtr = fSurface->getCanvas();
+          this->draw(*surfacePtr);
 
           // Finally do the painting after the drawing is done
           this->paint();
@@ -172,6 +260,8 @@ namespace varco {
 
 //              invalidateWindow();
 //          lastExposeEventTime = std::chrono::system_clock::now();
+
+          //this->paint();
 
         return true;
       } break;
@@ -253,6 +343,12 @@ namespace varco {
 
     XSelectInput(fDisplay, fWin, EVENT_MASK);
 
+    auto surfacePtr = fSurface->getCanvas();
+    this->draw(*surfacePtr);
+
+    // Finally do the painting after the drawing is done
+    this->paint();
+
     while(1) {
       XEvent evt;
       XNextEvent(fDisplay, &evt);
@@ -273,6 +369,15 @@ namespace varco {
   }
 
   void BaseOSWindow::paint() {
+
+
+    fContext->flush();
+
+    glXSwapBuffers(fDisplay, fWin);
+
+    return;
+
+
     if (fDisplay == nullptr)
       return; // No X display
     //if (this->fGLContext) // With GL no need for XPutImage
