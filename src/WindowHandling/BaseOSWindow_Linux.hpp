@@ -61,7 +61,7 @@ namespace varco {
 
     void mapWindowAndWait();
     void invalidateWindow();
-    std::chrono::time_point<std::chrono::system_clock> lastExposeEventTime;
+    std::chrono::time_point<std::chrono::system_clock> lastResizeEventTime;
     std::unique_ptr<std::thread> redrawThread;
     bool fNeedDraw = true;
     bool wndProc(XEvent *evt); // Returns false to exit the loop

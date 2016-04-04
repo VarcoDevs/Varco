@@ -96,7 +96,7 @@ namespace varco {
     glViewport(0, 0,
                     SkScalarRoundToInt(Width),
                     SkScalarRoundToInt(Height));
-    glClearColor(0, 0, 0, 255);
+    glClearColor(39, 40, 34, 255);
     glClearStencil(0);
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
@@ -207,6 +207,15 @@ namespace varco {
           if (!(Width > 0 && Height > 0))
             return true; // Nonsense painting a 0 area
 
+
+          auto now = std::chrono::system_clock::now();
+                 auto elapsedInterval = now - lastResizeEventTime;
+                 auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count();
+                 if (elapsedMs < 5) {
+                     invalidateWindow();
+                   return true; // Prevent resize repaint spamming
+                 }
+
           // Call the OS-independent draw function
           auto surfacePtr = fSurface->getCanvas();
           this->draw(*surfacePtr);
@@ -229,11 +238,11 @@ namespace varco {
 
         while (XCheckTypedWindowEvent(fDisplay, fWin, ConfigureNotify, evt) == True);
         this->resize(evt->xconfigure.width, evt->xconfigure.height);
-        //XMoveResizeWindow (fDisplay, fWin, 10, 10, Width, Height);
 
 
 
-//          auto now = std::chrono::system_clock::now();
+
+       lastResizeEventTime = std::chrono::system_clock::now();
 //              auto elapsedInterval = now - lastExposeEventTime;
 //              auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count();
 //              if (elapsedMs < 500) {
