@@ -11,6 +11,8 @@
 #include <SkSurfaceProps.h>
 #include <chrono>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 
 class GrContext;
 struct GrGLInterface;
@@ -47,6 +49,7 @@ namespace varco {
     Window fWin;
     GC fGc; // Graphic context
     GLXContext fGLContext;
+    GLXContext fSharedGLContext;
 
     std::unique_ptr<SkSurface> fSurface;
     std::unique_ptr<const SkSurfaceProps> fSurfaceProps;
@@ -55,7 +58,7 @@ namespace varco {
     AttachmentInfo fAttachmentInfo;
     const int requestedMSAASampleCount = 0; // Modify this to increase MSAA
     const GrGLInterface* fInterface;
-    GrRenderTarget* setupRenderTarget();
+    GrRenderTarget* setupRenderTarget(int width, int heigth);
 
   private:
 
@@ -67,6 +70,12 @@ namespace varco {
     bool wndProc(XEvent *evt); // Returns false to exit the loop
     void resize(int width, int height);
     void paint();
+
+    std::mutex renderMutex;
+    std::condition_variable renderCV;
+    std::thread renderThread;
+    void renderThreadFn();
+    bool stopRendering = false;
   };
 
 }

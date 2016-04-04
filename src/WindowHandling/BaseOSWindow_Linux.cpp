@@ -23,6 +23,11 @@ namespace varco {
   BaseOSWindow::BaseOSWindow(int argc, char **argv)
     : Argc(argc), Argv(argv), Width(545), Height(355)
   {
+
+    auto threadStat = XInitThreads();
+    if (!threadStat)
+      SkDebugf("XInitThreads() returned 0 (failure- this program may fail)");
+
     // Connect to the X server
     fDisplay = XOpenDisplay(nullptr);
     if (fDisplay == nullptr) {
@@ -87,7 +92,8 @@ namespace varco {
 
     // OpenGL initialization
     fGLContext = glXCreateContext(fDisplay, fVi, nullptr, GL_TRUE);
-    if (fGLContext == nullptr)
+    fSharedGLContext = glXCreateContext(fDisplay, fVi, fGLContext, GL_TRUE);
+    if (fGLContext == nullptr || fSharedGLContext == nullptr)
       throw std::runtime_error("Could not create an OpenGL context");
 
     auto res = glXMakeCurrent(fDisplay, fWin, fGLContext);
@@ -100,17 +106,9 @@ namespace varco {
     glClearStencil(0);
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-    fInterface = GrGLCreateNativeInterface();
-    if (fInterface == nullptr)
-      throw std::runtime_error("Could not create an OpenGL backend native interface");
-
-    fContext = GrContext::Create(kOpenGL_GrBackend, (GrBackendContext)fInterface);
-    if (fContext == nullptr)
-      throw std::runtime_error("Could not create an OpenGL backend");
-
     fSurfaceProps = std::make_unique<const SkSurfaceProps>(SkSurfaceProps::kLegacyFontHost_InitType);
-    fRenderTarget = setupRenderTarget(); // uses current width and height
-    fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+    //fRenderTarget = setupRenderTarget(); // uses current width and height
+    //fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
 
     XMapWindow(fDisplay, fWin); // Map and wait for the window to be ready
     XEvent event;
@@ -122,10 +120,10 @@ namespace varco {
     glXDestroyContext(fDisplay, fGLContext);
   }
 
-  GrRenderTarget* BaseOSWindow::setupRenderTarget() {
+  GrRenderTarget* BaseOSWindow::setupRenderTarget(int width, int heigth) {
     GrBackendRenderTargetDesc desc;
-    desc.fWidth = SkScalarRoundToInt(Width);
-    desc.fHeight = SkScalarRoundToInt(Height);
+    desc.fWidth = SkScalarRoundToInt(width);
+    desc.fHeight = SkScalarRoundToInt(heigth);
     desc.fConfig = fContext->caps()->srgbSupport() &&
                    (Bitmap.info().profileType() == kSRGB_SkColorProfileType ||
                     Bitmap.info().colorType() == kRGBA_F16_SkColorType)
@@ -143,9 +141,8 @@ namespace varco {
   void BaseOSWindow::resize(int width, int height) {
     this->Width = width;
     this->Height = height;
-    fRenderTarget = setupRenderTarget(); // render target has to be reset
-    fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
-    redraw();
+
+    //redraw();
   }
 
   static Atom wm_delete_window_message;
@@ -192,6 +189,73 @@ namespace varco {
     //lastExposeEventTime = std::chrono::system_clock::now();
   }
 
+  void BaseOSWindow::renderThreadFn() {
+
+    {
+      std::unique_lock<std::mutex> lk(renderMutex);
+
+      auto res = glXMakeCurrent(fDisplay, fWin, fSharedGLContext);
+      if (res == false)
+        throw std::runtime_error("Could not attach OpenGL context");
+
+      fInterface = GrGLCreateNativeInterface();
+      if (fInterface == nullptr)
+        throw std::runtime_error("Could not create an OpenGL backend native interface");
+
+      fContext = GrContext::Create(kOpenGL_GrBackend, (GrBackendContext)fInterface);
+      if (fContext == nullptr)
+        throw std::runtime_error("Could not create an OpenGL backend");
+
+      fRenderTarget = setupRenderTarget(Width, Height); // render target has to be reset
+      fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+    }
+
+    int threadWidth = Width, threadHeight = Height;
+
+    while(true) {
+
+      std::unique_lock<std::mutex> lk(renderMutex);
+
+      if (!(Width > 0 && Height > 0))
+        continue; // Nonsense painting a 0 area
+
+      if(stopRendering == true)
+        return;
+
+      bool resizing = false;
+      if (Width != threadWidth || Height != threadHeight) {
+        // Area has been changed, we're resizing
+        resizing = true;
+      }
+
+      auto res = glXMakeCurrent(fDisplay, fWin, fSharedGLContext);
+      if (res == false)
+        throw std::runtime_error("Could not attach OpenGL context");
+
+      if (Width != threadWidth || Height != threadHeight) {
+        fRenderTarget = setupRenderTarget(Width, Height); // render target has to be reset
+        fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+        threadWidth = Width;
+        threadHeight = Height;
+      }
+
+      // Call the OS-independent draw function
+      auto surfacePtr = fSurface->getCanvas();
+      this->draw(*surfacePtr);
+
+      if(stopRendering == true)
+        return;
+
+      if (resizing) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      } else {
+        fContext->flush();
+        glXSwapBuffers(fDisplay, fWin);
+      }
+    }
+
+  }
+
   bool BaseOSWindow::wndProc(XEvent *evt) {
 
     switch (evt->type) {
@@ -202,32 +266,32 @@ namespace varco {
                                        // if there are multiple ones
 
 
-          while (XCheckTypedWindowEvent(fDisplay, fWin, Expose, evt));
+//          while (XCheckTypedWindowEvent(fDisplay, fWin, Expose, evt));
 
-          if (!(Width > 0 && Height > 0))
-            return true; // Nonsense painting a 0 area
+//          if (!(Width > 0 && Height > 0))
+//            return true; // Nonsense painting a 0 area
 
 
-          auto now = std::chrono::system_clock::now();
-                 auto elapsedInterval = now - lastResizeEventTime;
-                 auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count();
-                 if (elapsedMs < 5) {
-                     invalidateWindow();
-                   return true; // Prevent resize repaint spamming
-                 }
+//          auto now = std::chrono::system_clock::now();
+//                 auto elapsedInterval = now - lastResizeEventTime;
+//                 auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count();
+//                 if (elapsedMs < 5) {
+//                     invalidateWindow();
+//                   return true; // Prevent resize repaint spamming
+//                 }
 
-          // Call the OS-independent draw function
-          auto surfacePtr = fSurface->getCanvas();
-          this->draw(*surfacePtr);
+//          // Call the OS-independent draw function
+//          auto surfacePtr = fSurface->getCanvas();
+//          this->draw(*surfacePtr);
 
-          // Finally do the painting after the drawing is done
-          this->paint();
+//          // Finally do the painting after the drawing is done
+//          this->paint();
 
-          static int lol = 0;
-          printf("Redrawing %d\n", lol++);
+//          static int lol = 0;
+//          printf("Redrawing %d\n", lol++);
         }
 
-        return true;
+        //return true;
 
       } break;
 
@@ -236,13 +300,14 @@ namespace varco {
         if (evt->xconfigure.window != fWin)
           return true;
 
+        // TODO: it seems width and height value are spoiled first time a resize is triggered
+        // we should probably use some sort of delta calculation to get them right
+
         while (XCheckTypedWindowEvent(fDisplay, fWin, ConfigureNotify, evt) == True);
         this->resize(evt->xconfigure.width, evt->xconfigure.height);
 
 
-
-
-       lastResizeEventTime = std::chrono::system_clock::now();
+       //lastResizeEventTime = std::chrono::system_clock::now();
 //              auto elapsedInterval = now - lastExposeEventTime;
 //              auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count();
 //              if (elapsedMs < 500) {
@@ -254,7 +319,7 @@ namespace varco {
 
           //this->paint();
 
-        return true;
+        //return true;
       } break;
 
       case ClientMessage: {
@@ -334,6 +399,9 @@ namespace varco {
 
     XSelectInput(fDisplay, fWin, EVENT_MASK);
 
+    std::function<void(void)> renderProc = std::bind(&BaseOSWindow::renderThreadFn, this);
+    renderThread = std::thread(renderProc);
+
     bool exitRequested = false;
     while(1) {
 
@@ -345,14 +413,17 @@ namespace varco {
         if (evt.xany.window == fWin) {
           continueLoop = wndProc(&evt);
 
-          if(continueLoop == false) // Exit requested
-            exitRequested = true;
+          if(continueLoop == false) { // Exit requested
+            stopRendering = true;
+          }
         }
       }
 
-      if (exitRequested)
+      if (stopRendering)
         break;
     }
+
+    renderThread.join();
   }
 
   void BaseOSWindow::startMouseCapture() { // Track the mouse to be notified when it leaves the client area
