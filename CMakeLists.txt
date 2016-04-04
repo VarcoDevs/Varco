@@ -2,6 +2,10 @@ cmake_minimum_required (VERSION 3.1)
 project (varco)
 set (CMAKE_CXX_STANDARD 14)
 
+if (NOT CMAKE_BUILD_TYPE)
+  set (CMAKE_BUILD_TYPE Release)
+endif ()
+
 set (SRCS src/init.cpp)
 set (INCLUDES src)
 set (LIBS)
@@ -10,6 +14,11 @@ find_package (OpenGL REQUIRED)
 list (APPEND LIBS ${OPENGL_LIBRARIES})
 
 ########################################### Skia dependency ###########################################
+
+if (CMAKE_BUILD_TYPE EQUAL Debug) # This shields us against Skia compile-time
+                                    # macros used in headers
+  add_definitions(-DSK_DEBUG)
+endif()
 
 # 7zip is used to decompress during configure the necessary dependencies
 set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

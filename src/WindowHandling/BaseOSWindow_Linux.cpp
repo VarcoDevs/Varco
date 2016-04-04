@@ -16,6 +16,10 @@ namespace varco {
                           ButtonReleaseMask|ExposureMask|PointerMotionMask|
                           KeyPressMask|KeyReleaseMask|LeaveWindowMask;
 
+  static Bool WaitForNotify(Display *d, XEvent *e, char *arg) { // Callback for window ready
+     return (e->type == MapNotify) && (e->xmap.window == (Window)arg);
+  }
+
   BaseOSWindow::BaseOSWindow(int argc, char **argv)
     : Argc(argc), Argv(argv), Width(545), Height(355)
   {
@@ -79,7 +83,6 @@ namespace varco {
 
     XStoreName(fDisplay, fWin, "Varco");
 
-    mapWindowAndWait();
     fGc = XCreateGC(fDisplay, fWin, 0, nullptr);
 
     // OpenGL initialization
@@ -108,6 +111,10 @@ namespace varco {
     fSurfaceProps = std::make_unique<const SkSurfaceProps>(SkSurfaceProps::kLegacyFontHost_InitType);
     fRenderTarget = setupRenderTarget(); // uses current width and height
     fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+
+    XMapWindow(fDisplay, fWin); // Map and wait for the window to be ready
+    XEvent event;
+    XIfEvent(fDisplay, &event, WaitForNotify, (char*)fWin);
   }
 
   BaseOSWindow::~BaseOSWindow() {
@@ -133,27 +140,12 @@ namespace varco {
     return fContext->textureProvider()->wrapBackendRenderTarget(desc);
   }
 
-  void BaseOSWindow::mapWindowAndWait() {
-    SkASSERT(fDisplay);
-    // Map the window on screen (i.e. make it visible)
-    XMapWindow(fDisplay, fWin);
-
-    // Ask to be notified of mapping accomplished
-    long eventMask = StructureNotifyMask;
-    XSelectInput(fDisplay, fWin, eventMask);
-
-    // Wait for the window mapping confirmation
-    XEvent evt;
-    do {
-      XNextEvent(fDisplay, &evt);
-    } while(evt.type != MapNotify);
-  }
-
   void BaseOSWindow::resize(int width, int height) {
     this->Width = width;
     this->Height = height;
     fRenderTarget = setupRenderTarget(); // render target has to be reset
     fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+    redraw();
   }
 
   static Atom wm_delete_window_message;
@@ -191,11 +183,11 @@ namespace varco {
     //if (!fNeedDraw) {
     //        fNeedDraw = true;
 
-    XEvent exppp;
-    memset(&exppp, 0, sizeof(exppp));
-    exppp.type = Expose;
-    exppp.xexpose.display = fDisplay;
-    XSendEvent(fDisplay, fWin, False, ExposureMask, &exppp);
+    XEvent evt;
+    memset(&evt, 0, sizeof(evt));
+    evt.type = Expose;
+    evt.xany.window = fWin;
+    XSendEvent(fDisplay, fWin, False, ExposureMask, &evt);
     //  }
     //lastExposeEventTime = std::chrono::system_clock::now();
   }
@@ -209,32 +201,11 @@ namespace varco {
         if (evt->xexpose.count == 0) { // Only handle the LAST expose redraw event
                                        // if there are multiple ones
 
-          bool resizePending = false;
-          while (XCheckTypedWindowEvent(fDisplay, fWin, ConfigureNotify, evt)) {
-              this->Width = evt->xconfigure.width;
-              this->Height = evt->xconfigure.height;
-              resizePending = true;
-          }
-          if (resizePending)
-            this->resize(this->Width, this->Height);
 
-          //while (XCheckTypedWindowEvent(fDisplay, fWin, Expose, evt));
+          while (XCheckTypedWindowEvent(fDisplay, fWin, Expose, evt));
 
           if (!(Width > 0 && Height > 0))
-            return 1; // Nonsense painting a 0 area
-//          else {
-//            // A resize might have occurred since last time
-////            if (Width != Bitmap.width() || Height != Bitmap.height()) {
-//////              Bitmap.allocPixels(SkImageInfo::Make(Width, Height,
-//////                                                   kN32_SkColorType,
-//////                                                   kPremul_SkAlphaType));
-////                glViewport(0, 0,
-////                                SkScalarRoundToInt(Width),
-////                                SkScalarRoundToInt(Height));
-////              fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget,
-////                                                               fSurfaceProps.get()).release());
-////            }
-//          }
+            return true; // Nonsense painting a 0 area
 
           // Call the OS-independent draw function
           auto surfacePtr = fSurface->getCanvas();
@@ -242,6 +213,9 @@ namespace varco {
 
           // Finally do the painting after the drawing is done
           this->paint();
+
+          static int lol = 0;
+          printf("Redrawing %d\n", lol++);
         }
 
         return true;
@@ -249,7 +223,15 @@ namespace varco {
       } break;
 
       case ConfigureNotify: {
+
+        if (evt->xconfigure.window != fWin)
+          return true;
+
+        while (XCheckTypedWindowEvent(fDisplay, fWin, ConfigureNotify, evt) == True);
         this->resize(evt->xconfigure.width, evt->xconfigure.height);
+        //XMoveResizeWindow (fDisplay, fWin, 10, 10, Width, Height);
+
+
 
 //          auto now = std::chrono::system_clock::now();
 //              auto elapsedInterval = now - lastExposeEventTime;
@@ -343,19 +325,23 @@ namespace varco {
 
     XSelectInput(fDisplay, fWin, EVENT_MASK);
 
-    auto surfacePtr = fSurface->getCanvas();
-    this->draw(*surfacePtr);
-
-    // Finally do the painting after the drawing is done
-    this->paint();
-
+    bool exitRequested = false;
     while(1) {
-      XEvent evt;
-      XNextEvent(fDisplay, &evt);
 
-      auto ret = wndProc(&evt);
+      while (XPending(fDisplay) > 0 && !exitRequested) {
+        XEvent evt;
+        XNextEvent(fDisplay, &evt);
 
-      if(ret == false) // Exit requested
+        bool continueLoop = true;
+        if (evt.xany.window == fWin) {
+          continueLoop = wndProc(&evt);
+
+          if(continueLoop == false) // Exit requested
+            exitRequested = true;
+        }
+      }
+
+      if (exitRequested)
         break;
     }
   }
@@ -375,43 +361,43 @@ namespace varco {
 
     glXSwapBuffers(fDisplay, fWin);
 
-    return;
+    //return;
 
 
-    if (fDisplay == nullptr)
-      return; // No X display
-    //if (this->fGLContext) // With GL no need for XPutImage
-    //  return;
+//    if (fDisplay == nullptr)
+//      return; // No X display
+//    //if (this->fGLContext) // With GL no need for XPutImage
+//    //  return;
 
-    // Draw the bitmap to the screen.
-    int width = Bitmap.width();
-    int height = Bitmap.height();
+//    // Draw the bitmap to the screen.
+//    int width = Bitmap.width();
+//    int height = Bitmap.height();
 
-    // Convert the bitmap to XImage
-    XImage image;
-    sk_bzero(&image, sizeof(image));
+//    // Convert the bitmap to XImage
+//    XImage image;
+//    sk_bzero(&image, sizeof(image));
 
-    int bitsPerPixel = Bitmap.bytesPerPixel() * 8;
-    image.width = Bitmap.width();
-    image.height = Bitmap.height();
-    image.format = ZPixmap;
-    image.data = (char*) Bitmap.getPixels();
-    image.byte_order = LSBFirst;
-    image.bitmap_unit = bitsPerPixel;
-    image.bitmap_bit_order = LSBFirst;
-    image.bitmap_pad = bitsPerPixel;
-    image.depth = 24;
-    image.bytes_per_line = Bitmap.rowBytes() - Bitmap.width() * 4;
-    image.bits_per_pixel = bitsPerPixel;
+//    int bitsPerPixel = Bitmap.bytesPerPixel() * 8;
+//    image.width = Bitmap.width();
+//    image.height = Bitmap.height();
+//    image.format = ZPixmap;
+//    image.data = (char*) Bitmap.getPixels();
+//    image.byte_order = LSBFirst;
+//    image.bitmap_unit = bitsPerPixel;
+//    image.bitmap_bit_order = LSBFirst;
+//    image.bitmap_pad = bitsPerPixel;
+//    image.depth = 24;
+//    image.bytes_per_line = Bitmap.rowBytes() - Bitmap.width() * 4;
+//    image.bits_per_pixel = bitsPerPixel;
 
-    auto res = XInitImage(&image);
-    if(res == false)
-      throw std::runtime_error("Could not initialize X server image structures");
+//    auto res = XInitImage(&image);
+//    if(res == false)
+//      throw std::runtime_error("Could not initialize X server image structures");
 
-    XPutImage(fDisplay, fWin, fGc, &image,
-              0, 0,     // src x,y
-              0, 0,     // dst x,y
-              width, height);
+//    XPutImage(fDisplay, fWin, fGc, &image,
+//              0, 0,     // src x,y
+//              0, 0,     // dst x,y
+//              width, height);
   }
 
 } // namespace varco
