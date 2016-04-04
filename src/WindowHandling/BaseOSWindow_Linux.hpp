@@ -73,9 +73,11 @@ namespace varco {
 
     std::mutex renderMutex;
     std::condition_variable renderCV;
+    bool redrawNeeded = false;
     std::thread renderThread;
     void renderThreadFn();
     bool stopRendering = false;
+    void setVsync(bool vsync);
   };
 
 }

@@ -94,11 +94,14 @@ namespace varco {
     fGLContext = glXCreateContext(fDisplay, fVi, nullptr, GL_TRUE);
     fSharedGLContext = glXCreateContext(fDisplay, fVi, fGLContext, GL_TRUE);
     if (fGLContext == nullptr || fSharedGLContext == nullptr)
-      throw std::runtime_error("Could not create an OpenGL context");
+      throw std::runtime_error("Could not create an OpenGL context");    
 
     auto res = glXMakeCurrent(fDisplay, fWin, fGLContext);
     if (res == false)
       throw std::runtime_error("Could not attach OpenGL context");
+
+    setVsync(false);
+
     glViewport(0, 0,
                     SkScalarRoundToInt(Width),
                     SkScalarRoundToInt(Height));
@@ -112,7 +115,7 @@ namespace varco {
 
     XMapWindow(fDisplay, fWin); // Map and wait for the window to be ready
     XEvent event;
-    XIfEvent(fDisplay, &event, WaitForNotify, (char*)fWin);
+    XIfEvent(fDisplay, &event, WaitForNotify, (char*)fWin);    
   }
 
   BaseOSWindow::~BaseOSWindow() {
@@ -138,11 +141,9 @@ namespace varco {
     return fContext->textureProvider()->wrapBackendRenderTarget(desc);
   }
 
-  void BaseOSWindow::resize(int width, int height) {
+  void BaseOSWindow::resize(int width, int height) {    
     this->Width = width;
-    this->Height = height;
-
-    //redraw();
+    this->Height = height;    
   }
 
   static Atom wm_delete_window_message;
@@ -189,6 +190,32 @@ namespace varco {
     //lastExposeEventTime = std::chrono::system_clock::now();
   }
 
+  // Some helper code to load the correct version of glXSwapInterval
+  #define GLX_GET_PROC_ADDR(name) glXGetProcAddress(reinterpret_cast<const GLubyte*>((name)))
+  #define EXT_WRANGLE(name, type, ...) \
+      if (GLX_GET_PROC_ADDR(#name)) { \
+          static type k##name; \
+          if (!k##name) { \
+              k##name = (type) GLX_GET_PROC_ADDR(#name); \
+          } \
+          k##name(__VA_ARGS__); \
+          /*SkDebugf("using %s\n", #name);*/ \
+          return; \
+      }
+
+  static void glXSwapInterval(Display* dsp, GLXDrawable drawable, int interval) {
+      EXT_WRANGLE(glXSwapIntervalEXT, PFNGLXSWAPINTERVALEXTPROC, dsp, drawable, interval);
+      EXT_WRANGLE(glXSwapIntervalMESA, PFNGLXSWAPINTERVALMESAPROC, interval);
+      EXT_WRANGLE(glXSwapIntervalSGI, PFNGLXSWAPINTERVALSGIPROC, interval);
+  }
+
+  void BaseOSWindow::setVsync(bool vsync) {
+    if (fDisplay && fGLContext && fWin) {
+      int swapInterval = vsync ? 1 : 0;
+      glXSwapInterval(glXGetCurrentDisplay(),glXGetCurrentReadDrawable(), swapInterval);
+    }
+  }
+
   void BaseOSWindow::renderThreadFn() {
 
     {
@@ -208,6 +235,8 @@ namespace varco {
 
       fRenderTarget = setupRenderTarget(Width, Height); // render target has to be reset
       fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+
+      setVsync(false);
     }
 
     int threadWidth = Width, threadHeight = Height;
@@ -215,6 +244,10 @@ namespace varco {
     while(true) {
 
       std::unique_lock<std::mutex> lk(renderMutex);
+      while (!redrawNeeded) {
+        renderCV.wait(lk);
+        if (!redrawNeeded) {} // Spurious wakeup
+      }
 
       if (!(Width > 0 && Height > 0))
         continue; // Nonsense painting a 0 area
@@ -246,12 +279,23 @@ namespace varco {
       if(stopRendering == true)
         return;
 
-      if (resizing) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      } else {
-        fContext->flush();
-        glXSwapBuffers(fDisplay, fWin);
-      }
+      //if (resizing) {
+     //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+     // } else {
+
+static int lol = 0;
+printf("I have redrawn the damn thing %d\n", lol++);
+
+
+                           fContext->flush();
+                           glXSwapBuffers(fDisplay, fWin);
+
+      if (Width == threadWidth && Height == threadHeight) // Check for size to be updated
+        redrawNeeded = false;
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+      //}
     }
 
   }
@@ -265,8 +309,13 @@ namespace varco {
         if (evt->xexpose.count == 0) { // Only handle the LAST expose redraw event
                                        // if there are multiple ones
 
+            while (XCheckTypedWindowEvent(fDisplay, fWin, Expose, evt));
 
-//          while (XCheckTypedWindowEvent(fDisplay, fWin, Expose, evt));
+            std::unique_lock<std::mutex> lk(renderMutex);
+            redrawNeeded = true;
+            renderCV.notify_one();
+
+//
 
 //          if (!(Width > 0 && Height > 0))
 //            return true; // Nonsense painting a 0 area
@@ -291,20 +340,22 @@ namespace varco {
 //          printf("Redrawing %d\n", lol++);
         }
 
-        //return true;
+        return true;
 
       } break;
 
       case ConfigureNotify: {
 
         if (evt->xconfigure.window != fWin)
-          return true;
+          break;
 
-        // TODO: it seems width and height value are spoiled first time a resize is triggered
-        // we should probably use some sort of delta calculation to get them right
+        while (XCheckTypedWindowEvent(fDisplay, evt->xany.window, ConfigureNotify, evt));
 
-        while (XCheckTypedWindowEvent(fDisplay, fWin, ConfigureNotify, evt) == True);
-        this->resize(evt->xconfigure.width, evt->xconfigure.height);
+        this->resize(evt->xconfigurerequest.width, evt->xconfigurerequest.height);
+        redrawNeeded = true;
+        renderCV.notify_one();
+
+
 
 
        //lastResizeEventTime = std::chrono::system_clock::now();
@@ -319,7 +370,6 @@ namespace varco {
 
           //this->paint();
 
-        //return true;
       } break;
 
       case ClientMessage: {
@@ -405,17 +455,16 @@ namespace varco {
     bool exitRequested = false;
     while(1) {
 
-      while (XPending(fDisplay) > 0 && !exitRequested) {
-        XEvent evt;
-        XNextEvent(fDisplay, &evt);
+      XEvent evt;
+      XNextEvent(fDisplay, &evt);
 
-        bool continueLoop = true;
-        if (evt.xany.window == fWin) {
-          continueLoop = wndProc(&evt);
+      bool continueLoop = true;
+      if (evt.xany.window == fWin) {
 
-          if(continueLoop == false) { // Exit requested
-            stopRendering = true;
-          }
+        continueLoop = wndProc(&evt);
+
+        if(continueLoop == false) { // Exit requested
+          stopRendering = true;
         }
       }
 
@@ -423,7 +472,7 @@ namespace varco {
         break;
     }
 
-    renderThread.join();
+    renderThread.detach();
   }
 
   void BaseOSWindow::startMouseCapture() { // Track the mouse to be notified when it leaves the client area
@@ -437,9 +486,9 @@ namespace varco {
   void BaseOSWindow::paint() {
 
 
-    fContext->flush();
+  //  fContext->flush();
 
-    glXSwapBuffers(fDisplay, fWin);
+  //  glXSwapBuffers(fDisplay, fWin);
 
     //return;
 
