@@ -128,6 +128,10 @@ namespace varco {
       return;
     }
 
+
+
+
+
     int a, b;
     auto ret = XSyncQueryExtension(fDisplay, &a, &b);
     ret = XSyncInitialize(fDisplay, &a, &b);
@@ -200,12 +204,19 @@ namespace varco {
             X_ATOM(_NET_WM_SYNC_REQUEST),
             X_ATOM(_NET_WM_SYNC_REQUEST_COUNTER)
         };
-        XSetWMProtocols(fDisplay, fWin, wm_protocols, NELEMS(wm_protocols));
+        ret = XSetWMProtocols(fDisplay, fWin, wm_protocols, NELEMS(wm_protocols));
 
         /* wm protocol for killing hung process */
         XSetWMProperties(fDisplay, fWin, NULL, NULL, NULL, 0, NULL, NULL, NULL);
+
+        Atom *list;
+        int len;
+        ret = XGetWMProtocols(fDisplay, fWin, &list, &len);
+        for(int i=0; i < len; ++i)
+          printf("%d\n", list[i]);
+
         pid_t pid = getpid();
-        XChangeProperty(
+        ret = XChangeProperty(
             fDisplay, fWin, X_ATOM(_NET_WM_PID), XA_CARDINAL, 32,
             PropModeReplace, (unsigned char *) &pid, 1);
 
@@ -213,7 +224,7 @@ namespace varco {
             netwm_sync_value.hi = 0;
             netwm_sync_value.lo = 0;
             netwm_sync_counter = XSyncCreateCounter(fDisplay, netwm_sync_value);
-            XChangeProperty(
+            ret = XChangeProperty(
                 fDisplay, fWin, X_ATOM(_NET_WM_SYNC_REQUEST_COUNTER), XA_CARDINAL, 32,
                 PropModeReplace, (unsigned char *) &netwm_sync_counter, 1);
 
@@ -234,7 +245,7 @@ namespace varco {
     if (res == false)
       throw std::runtime_error("Could not attach OpenGL context");
 
-    setVsync(false);
+    //setVsync(false);
 
     glViewport(0, 0,
                     SkScalarRoundToInt(Width),
@@ -411,7 +422,7 @@ namespace varco {
       fRenderTarget = setupRenderTarget(Width, Height); // render target has to be reset
       fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
 
-      setVsync(false);
+      //setVsync(false);
     }
 
     int threadWidth = Width, threadHeight = Height;
@@ -465,8 +476,16 @@ printf("I have redrawn the damn thing %d\n", lol++);
                            fContext->flush();
                            glXSwapBuffers(fDisplay, fWin);
 
-      if (Width == threadWidth && Height == threadHeight) // Check for size to be updated
+      if (Width == threadWidth && Height == threadHeight) {// Check for size to be updated
         redrawNeeded = false;
+
+        // set netwm sync counter to signal that we're done redrawing (WM/DM is waiting)
+        if (flags & WF_NETWM_SYNC) {
+            XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
+            flags &= ~WF_NETWM_SYNC;
+            printf("sync done\n");
+        }
+      }
 
       //std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
@@ -524,12 +543,7 @@ printf("I have redrawn the damn thing %d\n", lol++);
         //if (evt->xconfigure.window != fWin)
         //  break;
 
-        /* set netwm sync counter */
-            if (flags & WF_NETWM_SYNC) {
-                XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
-                flags &= ~WF_NETWM_SYNC;
-                printf("sync done\n");
-            }
+
 
 //        while (XCheckTypedWindowEvent(fDisplay, evt->xany.window, ConfigureNotify, evt)) {
 //          this->resize(evt->xconfigure.width, evt->xconfigure.height);
@@ -568,8 +582,9 @@ printf("I have redrawn the damn thing %d\n", lol++);
                   printf("ping!\n");
               }
               else if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_SYNC_REQUEST)) {
-                  if (flags & WF_NETWM_SYNC)
-                      XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
+//                  if (flags & WF_NETWM_SYNC)
+//                      XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
+                  flags |= WF_NETWM_SYNC;
                   netwm_sync_value.hi = evt->xclient.data.l[3];
                   netwm_sync_value.lo = evt->xclient.data.l[2];
                   printf("sync request\n");
