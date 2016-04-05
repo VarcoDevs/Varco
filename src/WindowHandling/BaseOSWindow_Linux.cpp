@@ -8,6 +8,7 @@
 #include <gl/GrGLUtil.h>
 #include <GrContext.h>
 //#include <SkGr.h>
+#include <vector>
 
 namespace varco {
 
@@ -19,6 +20,98 @@ namespace varco {
   static Bool WaitForNotify(Display *d, XEvent *e, char *arg) { // Callback for window ready
      return (e->type == MapNotify) && (e->xmap.window == (Window)arg);
   }
+
+
+  enum {
+      _X_ATOM_INDEX_UTF8_STRING,
+      _X_ATOM_INDEX_WM_PROTOCOLS,
+      _X_ATOM_INDEX_WM_DELETE_WINDOW,
+      _X_ATOM_INDEX_WM_SAVE_YOURSELF,
+      _X_ATOM_INDEX_WM_TAKE_FOCUS,
+      _X_ATOM_INDEX_WM_CLIENT_MACHINE,
+      _X_ATOM_INDEX_WM_CLIENT_LEADER,
+      _X_ATOM_INDEX__MOTIF_WM_HINTS,
+      _X_ATOM_INDEX__NET_WM_NAME,
+      _X_ATOM_INDEX__NET_WM_STATE,
+      _X_ATOM_INDEX__NET_WM_STATE_HIDDEN,
+      _X_ATOM_INDEX__NET_WM_STATE_FULLSCREEN,
+      _X_ATOM_INDEX__NET_WM_PID,
+      _X_ATOM_INDEX__NET_WM_PING,
+      _X_ATOM_INDEX__NET_WM_SYNC_REQUEST,
+      _X_ATOM_INDEX__NET_WM_SYNC_REQUEST_COUNTER,
+      _X_ATOM_INDEX_XdndAware,
+      _X_ATOM_INDEX_XdndEnter,
+      _X_ATOM_INDEX_XdndLeave,
+      _X_ATOM_INDEX_XdndPosition,
+      _X_ATOM_INDEX_XdndStatus,
+      _X_ATOM_INDEX_XdndDrop,
+      _X_ATOM_INDEX_XdndFinished,
+      _X_ATOM_INDEX_XdndTypeList,
+      _X_ATOM_INDEX_MIME_TYPE_text__plain,
+      _X_ATOM_INDEX_MIME_TYPE_text__unicode,
+      _X_ATOM_INDEX_MIME_TYPE_text__x_moz_url,
+      _X_ATOM_INDEX_MIME_TYPE_text__uri_list,
+  };
+  static const char *const atom_names[] = {
+      "UTF8_STRING",
+      "WM_PROTOCOLS",
+      "WM_DELETE_WINDOW",
+      "WM_SAVE_YOURSELF",
+      "WM_TAKE_FOCUS",
+      "WM_CLIENT_MACHINE",
+      "WM_CLIENT_LEADER",
+      "_MOTIF_WM_HINTS",
+      "_NET_WM_NAME",
+      "_NET_WM_STATE",
+      "_NET_WM_STATE_HIDDEN",
+      "_NET_WM_STATE_FULLSCREEN",
+      "_NET_WM_PID",
+      "_NET_WM_PING",
+      "_NET_WM_SYNC_REQUEST",
+      "_NET_WM_SYNC_REQUEST_COUNTER",
+      "XdndAware",
+      "XdndEnter",
+      "XdndLeave",
+      "XdndPosition",
+      "XdndStatus",
+      "XdndDrop",
+      "XdndFinished",
+      "XdndTypeList",
+      "text/plain",
+      "text/unicode",
+      "text/x-moz-url",
+      "text/uri-list",
+  };
+  #define X_ATOM(name) __lwi_atoms[_X_ATOM_INDEX_##name]
+  #define NELEMS(a) (sizeof(a) / sizeof((a)[0]))
+
+  Atom __lwi_atoms[NELEMS(atom_names)];
+
+  static const int WF_NETWM_SYNC  = 0x20;
+
+  enum {
+      _X_EXTENSION_DBE,
+      _X_EXTENSION_SHM,
+      _X_EXTENSION_GLX,
+      _X_EXTENSION_RENDER,
+      _X_EXTENSION_VIDMODE,
+      _X_EXTENSION_FIXES,
+      _X_EXTENSION_SYNC,
+  };
+
+  #define X __lwi_context
+
+   #define X_HAS_EXTENSION(n) (X.extensions & (1 << (n)))
+
+  /* X extensions */
+  #define X_HAS_DBE     X_HAS_EXTENSION(_X_EXTENSION_DBE)
+  #define X_HAS_SHM     X_HAS_EXTENSION(_X_EXTENSION_SHM)
+  #define X_HAS_GL      X_HAS_EXTENSION(_X_EXTENSION_GLX)
+  #define X_HAS_RENDER  X_HAS_EXTENSION(_X_EXTENSION_RENDER)
+  #define X_HAS_VIDMODE X_HAS_EXTENSION(_X_EXTENSION_VIDMODE)
+  #define X_HAS_FIXES   X_HAS_EXTENSION(_X_EXTENSION_FIXES)
+  #define X_HAS_SYNC    X_HAS_EXTENSION(_X_EXTENSION_SYNC)
+
 
   BaseOSWindow::BaseOSWindow(int argc, char **argv)
     : Argc(argc), Argv(argv), Width(545), Height(355)
@@ -34,6 +127,19 @@ namespace varco {
       SkDebugf("Could not open a connection to an X Display");
       return;
     }
+
+    int a, b;
+    auto ret = XSyncQueryExtension(fDisplay, &a, &b);
+    ret = XSyncInitialize(fDisplay, &a, &b);
+
+
+    for (unsigned i = 0; i < NELEMS(atom_names); i++) {
+            __lwi_atoms[i] = XInternAtom(fDisplay, atom_names[i], False);
+            printf("%s is now [%d]\n", atom_names[i], __lwi_atoms[i]);
+      }
+
+
+
     
     GLint att[] = { // Create a window which supports GL
       GLX_RGBA,
@@ -86,6 +192,34 @@ namespace varco {
                          CWEventMask | CWColormap,
                          &swa);
 
+
+    Atom wm_protocols[] = {
+            X_ATOM(WM_DELETE_WINDOW),
+            X_ATOM(WM_TAKE_FOCUS),
+            X_ATOM(_NET_WM_PING),
+            X_ATOM(_NET_WM_SYNC_REQUEST),
+            X_ATOM(_NET_WM_SYNC_REQUEST_COUNTER)
+        };
+        XSetWMProtocols(fDisplay, fWin, wm_protocols, NELEMS(wm_protocols));
+
+        /* wm protocol for killing hung process */
+        XSetWMProperties(fDisplay, fWin, NULL, NULL, NULL, 0, NULL, NULL, NULL);
+        pid_t pid = getpid();
+        XChangeProperty(
+            fDisplay, fWin, X_ATOM(_NET_WM_PID), XA_CARDINAL, 32,
+            PropModeReplace, (unsigned char *) &pid, 1);
+
+
+            netwm_sync_value.hi = 0;
+            netwm_sync_value.lo = 0;
+            netwm_sync_counter = XSyncCreateCounter(fDisplay, netwm_sync_value);
+            XChangeProperty(
+                fDisplay, fWin, X_ATOM(_NET_WM_SYNC_REQUEST_COUNTER), XA_CARDINAL, 32,
+                PropModeReplace, (unsigned char *) &netwm_sync_counter, 1);
+
+            flags |= WF_NETWM_SYNC;
+
+
     XStoreName(fDisplay, fWin, "Varco");
 
     fGc = XCreateGC(fDisplay, fWin, 0, nullptr);
@@ -115,7 +249,47 @@ namespace varco {
 
     XMapWindow(fDisplay, fWin); // Map and wait for the window to be ready
     XEvent event;
-    XIfEvent(fDisplay, &event, WaitForNotify, (char*)fWin);    
+    XIfEvent(fDisplay, &event, WaitForNotify, (char*)fWin);
+
+
+//    XSynchronize(fDisplay, True); // for debugging purposes, report all errors immediately
+//    Atom *atomList;
+//    int atomLen;
+//    auto status = XGetWMProtocols(fDisplay, fWin, &atomList, &atomLen);
+//    if(status == 0)
+//      printf("no");
+
+//    auto Atom_wmProtocols = XInternAtom(fDisplay, "WM_PROTOCOLS", True);
+//    if (Atom_wmProtocols == None)
+//      printf("no");
+
+//    auto Atom_syncRequest = XInternAtom(fDisplay, "_NET_WM_SYNC_REQUEST", True);
+//    if (Atom_syncRequest == None)
+//      printf("no");
+
+//    auto Atom_syncRequestCounter = XInternAtom(fDisplay, "_NET_WM_SYNC_REQUEST_COUNTER", True);
+//    if (Atom_syncRequestCounter == None)
+//      printf("no");
+
+
+//    atoms.push_back(Atom_wmProtocols);
+//    atoms.push_back(Atom_syncRequest);
+//    atoms.push_back(Atom_syncRequestCounter);
+
+//    status = XSetWMProtocols(fDisplay, fWin, atoms.data(), atoms.size());
+//    if(status == 0)
+//      printf("no");
+
+//    size_t length = atoms->length;
+//    jint* atomsBegin = elements(atoms);
+//    jint* atomsEnd   = atomsBegin + length;
+
+
+//    std::vector<XLibAtom> atomVector(atomsBegin, atomsEnd);
+//    XLibAtom* atomsArray = &(atomVector.front());
+
+//    XSetWMProtocols(dpy, xid, atomsArray, length);
+
   }
 
   BaseOSWindow::~BaseOSWindow() {
@@ -146,7 +320,8 @@ namespace varco {
     this->Height = height;    
   }
 
-  static Atom wm_delete_window_message;
+
+
 
   namespace {
 
@@ -293,7 +468,7 @@ printf("I have redrawn the damn thing %d\n", lol++);
       if (Width == threadWidth && Height == threadHeight) // Check for size to be updated
         redrawNeeded = false;
 
-      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      //std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
       //}
     }
@@ -346,12 +521,21 @@ printf("I have redrawn the damn thing %d\n", lol++);
 
       case ConfigureNotify: {
 
-        if (evt->xconfigure.window != fWin)
-          break;
+        //if (evt->xconfigure.window != fWin)
+        //  break;
 
-        while (XCheckTypedWindowEvent(fDisplay, evt->xany.window, ConfigureNotify, evt));
+        /* set netwm sync counter */
+            if (flags & WF_NETWM_SYNC) {
+                XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
+                flags &= ~WF_NETWM_SYNC;
+                printf("sync done\n");
+            }
 
-        this->resize(evt->xconfigurerequest.width, evt->xconfigurerequest.height);
+//        while (XCheckTypedWindowEvent(fDisplay, evt->xany.window, ConfigureNotify, evt)) {
+//          this->resize(evt->xconfigure.width, evt->xconfigure.height);
+//        }
+
+        this->resize(evt->xconfigure.width, evt->xconfigure.height);
         redrawNeeded = true;
         renderCV.notify_one();
 
@@ -373,7 +557,25 @@ printf("I have redrawn the damn thing %d\n", lol++);
       } break;
 
       case ClientMessage: {
-        if ((Atom)evt->xclient.data.l[0] == wm_delete_window_message)
+
+          printf("Received %d\n", evt->xclient.data.l[0]);
+
+          if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_PING)) {
+              evt->xclient.window = fWin;
+                  //xe->window = w->wid;
+                  XSendEvent(fDisplay, DefaultRootWindow(fDisplay), False,
+                      SubstructureNotifyMask | SubstructureRedirectMask, (XEvent *) evt);
+                  printf("ping!\n");
+              }
+              else if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_SYNC_REQUEST)) {
+                  if (flags & WF_NETWM_SYNC)
+                      XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
+                  netwm_sync_value.hi = evt->xclient.data.l[3];
+                  netwm_sync_value.lo = evt->xclient.data.l[2];
+                  printf("sync request\n");
+              }
+
+        else if ((Atom)evt->xclient.data.l[0] == X_ATOM(WM_DELETE_WINDOW)) // wm_delete_window_message
           return false;
       } break;
 
@@ -444,9 +646,6 @@ printf("I have redrawn the damn thing %d\n", lol++);
       return 1; // Error
     }
 
-    wm_delete_window_message = XInternAtom(fDisplay, "WM_DELETE_WINDOW", False);
-    XSetWMProtocols(fDisplay, fWin, &wm_delete_window_message, 1);
-
     XSelectInput(fDisplay, fWin, EVENT_MASK);
 
     std::function<void(void)> renderProc = std::bind(&BaseOSWindow::renderThreadFn, this);
@@ -459,14 +658,14 @@ printf("I have redrawn the damn thing %d\n", lol++);
       XNextEvent(fDisplay, &evt);
 
       bool continueLoop = true;
-      if (evt.xany.window == fWin) {
+      //if (evt.xany.window == fWin) {
 
         continueLoop = wndProc(&evt);
 
         if(continueLoop == false) { // Exit requested
           stopRendering = true;
         }
-      }
+      //}
 
       if (stopRendering)
         break;

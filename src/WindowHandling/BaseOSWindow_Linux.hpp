@@ -3,6 +3,7 @@
 
 #include <GL/glx.h>
 #include <X11/Xlib.h>
+#include <X11/extensions/sync.h>
 
 #include <Utils/Commons.hpp>
 #include <Utils/VKeyCodes.hpp>
@@ -13,6 +14,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <vector>
 
 class GrContext;
 struct GrGLInterface;
@@ -78,6 +80,11 @@ namespace varco {
     void renderThreadFn();
     bool stopRendering = false;
     void setVsync(bool vsync);
+
+    XSyncCounter netwm_sync_counter;
+    XSyncValue netwm_sync_value;
+    int flags = 0;
+
   };
 
 }
