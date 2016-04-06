@@ -15,10 +15,10 @@ list (APPEND LIBS ${OPENGL_LIBRARIES})
 
 ########################################### Skia dependency ###########################################
 
-if (CMAKE_BUILD_TYPE EQUAL Debug) # This shields us against Skia compile-time
-                                    # macros used in headers
-  add_definitions(-DSK_DEBUG)
-endif()
+# This shields us against Skia compile-time macros used in headers
+set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DSK_DEBUG")
+# No gpu log calls in debug
+set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGR_GL_LOG_CALLS=0 -DGR_GL_CHECK_ERROR=0")
 
 # 7zip is used to decompress during configure the necessary dependencies
 set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -116,6 +116,10 @@ set (UTILS_SRCS
             src/Utils/Commons.hpp
             src/Utils/Utils.hpp
             src/Utils/VKeyCodes.hpp)
+if (WIN32)
+  list (APPEND UTILS_SRCS src/Utils/WGL.hpp
+                          src/Utils/WGL.cpp)
+endif()
 list (APPEND SRCS ${UTILS_SRCS})
 source_group (Utils FILES ${UTILS_SRCS})
 

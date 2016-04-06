@@ -1,12 +1,21 @@
 #ifndef VARCO_BASEOSWINDOW_WIN_HPP
 #define VARCO_BASEOSWINDOW_WIN_HPP
 
+#include <Utils/WGL.hpp>
+#include <Utils/Commons.hpp>
 #include <Utils/VKeyCodes.hpp>
 #include <SkCanvas.h>
 #include <SkSurface.h>
 #include "windows.h"
 #include <functional>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <memory>
+
+class GrContext;
+struct GrGLInterface;
+class GrRenderTarget;
 
 namespace varco {
 
@@ -15,6 +24,7 @@ namespace varco {
 
     BaseOSWindow(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, 
                  int nCmdShow);
+    virtual ~BaseOSWindow();
 
     int show();
     
@@ -35,6 +45,16 @@ namespace varco {
     int Width, Height;
     SkBitmap Bitmap;
 
+    void *fHGLRC;
+    std::unique_ptr<SkSurface> fSurface;
+    std::unique_ptr<const SkSurfaceProps> fSurfaceProps;
+    GrContext* fContext;
+    GrRenderTarget* fRenderTarget;
+    AttachmentInfo fAttachmentInfo;
+    const int requestedMSAASampleCount = 0; // Modify this to increase MSAA
+    const GrGLInterface* fInterface;
+    GrRenderTarget* setupRenderTarget(int width, int heigth);
+
   private:
     LRESULT wndProcInternal(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
     std::function<LRESULT(HWND, UINT, WPARAM, LPARAM)> wndProc;
@@ -43,6 +63,13 @@ namespace varco {
     void resize(int width, int height);
 
     std::unique_ptr<SkSurface> surface;
+
+    std::mutex renderMutex;
+    std::condition_variable renderCV;
+    bool redrawNeeded = false;
+    bool stopRendering = false;
+    std::thread renderThread;
+    void renderThreadFn();
   };
 
 }

@@ -1,5 +1,10 @@
 #include <WindowHandling/BaseOSWindow_Win.hpp>
+#include <gl/GrGLInterface.h>
+#include <gl/GrGLUtil.h>
+#include <GrContext.h>
 #include <Utils/Utils.hpp>
+#include <GL/gl.h>
+#include <stdexcept>
 
 // Specify the windows subsystem
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
@@ -76,7 +81,7 @@ namespace varco {
     WC.hbrBackground = NULL; // No background
     // Todo set icon properly
     WC.hCursor = LoadCursor(NULL, IDC_ARROW);
-
+    
     if (!RegisterClassEx(&WC)) {
       MessageBox(NULL, "Window registration failed", "Error", MB_ICONEXCLAMATION);
       return;
@@ -91,17 +96,82 @@ namespace varco {
     }
 
     this->resize(this->Width, this->Height);
+
+    // Prepare GL context
+    HDC dc = GetDC((HWND)hWnd);
+    fHGLRC = createWGLContext(dc, requestedMSAASampleCount);
+    if (fHGLRC == nullptr)
+      throw std::runtime_error("Could not create GL context");    
+
+    if (!wglMakeCurrent(dc, (HGLRC)fHGLRC))
+      throw std::runtime_error("Could not set the GL context");
+
+    // use DescribePixelFormat to get the stencil bit depth
+    int pixelFormat = GetPixelFormat(dc);
+    PIXELFORMATDESCRIPTOR pfd;
+    DescribePixelFormat(dc, pixelFormat, sizeof(pfd), &pfd);
+    fAttachmentInfo.fStencilBits = pfd.cStencilBits;
+
+    // Get sample count if the MSAA WGL extension is present
+    WGLExtensions extensions;
+    if (extensions.hasExtension(dc, "WGL_ARB_multisample")) {
+      static const int kSampleCountAttr = WGL_SAMPLES;
+      extensions.getPixelFormatAttribiv(dc, pixelFormat, 0, 1, &kSampleCountAttr,
+        &fAttachmentInfo.fSampleCount);
+    } else
+      fAttachmentInfo.fSampleCount = 0;
+
+    glViewport(0, 0,
+      SkScalarRoundToInt(this->Width),
+      SkScalarRoundToInt(this->Height));
+
+    glClearStencil(0);
+    glClearColor(0, 0, 0, 0);
+    glStencilMask(0xffffffff);
+    glClear(GL_STENCIL_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+    fSurfaceProps = std::make_unique<const SkSurfaceProps>(SkSurfaceProps::kLegacyFontHost_InitType);
+
+    ReleaseDC(hWnd, dc);
+    wglMakeCurrent(NULL, NULL);
+  }
+
+  BaseOSWindow::~BaseOSWindow() {
+    wglMakeCurrent(GetDC((HWND)hWnd), 0);
+    wglDeleteContext((HGLRC)fHGLRC);
+  }
+
+  GrRenderTarget* BaseOSWindow::setupRenderTarget(int width, int heigth) {
+    GrBackendRenderTargetDesc desc;
+    desc.fWidth = SkScalarRoundToInt(width);
+    desc.fHeight = SkScalarRoundToInt(heigth);
+    desc.fConfig = fContext->caps()->srgbSupport() &&
+      (Bitmap.info().profileType() == kSRGB_SkColorProfileType ||
+        Bitmap.info().colorType() == kRGBA_F16_SkColorType)
+      ? kSkiaGamma8888_GrPixelConfig
+      : kSkia8888_GrPixelConfig;
+    desc.fOrigin = kBottomLeft_GrSurfaceOrigin;
+    desc.fSampleCnt = fAttachmentInfo.fSampleCount;
+    desc.fStencilBits = fAttachmentInfo.fStencilBits;
+    GrGLint buffer;
+    GR_GL_GetIntegerv(fInterface, GR_GL_FRAMEBUFFER_BINDING, &buffer);
+    desc.fRenderTargetHandle = buffer;
+    return fContext->textureProvider()->wrapBackendRenderTarget(desc);
   }
 
   int BaseOSWindow::show() {
     ShowWindow(hWnd, CmdShow);
     UpdateWindow(hWnd);
 
+    std::function<void(void)> renderProc = std::bind(&BaseOSWindow::renderThreadFn, this);
+    renderThread = std::thread(renderProc);
+
     MSG Msg;
     while (GetMessage(&Msg, NULL, 0, 0) > 0) {
       TranslateMessage(&Msg);
       DispatchMessage(&Msg);
     }
+    renderThread.detach();
     return static_cast<int>(Msg.wParam);
   }
 
@@ -166,33 +236,16 @@ namespace varco {
         auto height = HIWORD(lParam);
         this->resize(width, height);
 
-        redraw();
+        std::unique_lock<std::mutex> lk(renderMutex);
+        redrawNeeded = true;
+        renderCV.notify_one();
       } break;
 
       case WM_PAINT: {
 
-        /*MSG msg;
-        while (PeekMessage(&msg, hWnd, 0, 0, PM_QS_PAINT)) {
-        }*/
-
-        if (!(Width > 0 && Height > 0))
-          return 1; // Nonsense painting a 0 area
-        else {
-          if (Width != Bitmap.width() || Height != Bitmap.height())
-            Bitmap.allocPixels(SkImageInfo::Make(Width, Height, kN32_SkColorType, kPremul_SkAlphaType));
-        }
-
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-
-        // Call the OS-independent draw function        
-        SkCanvas canvas(this->Bitmap);
-        this->draw(canvas);
-
-        // Finally do the painting after the drawing is done
-        this->paint(hdc, false);
-
-        EndPaint(hWnd, &ps);
+        std::unique_lock<std::mutex> lk(renderMutex);
+        redrawNeeded = true;
+        renderCV.notify_one();
 
         return 0; // Completely handled
 
@@ -214,49 +267,139 @@ namespace varco {
     InvalidateRect(this->hWnd, nullptr, FALSE); // Send a WM_PAINT
   }
 
+  void BaseOSWindow::renderThreadFn() {
+    {
+      std::unique_lock<std::mutex> lk(renderMutex);
+
+      HDC dc = GetDC((HWND)hWnd);
+      auto res = wglMakeCurrent(dc, (HGLRC)fHGLRC);
+      if (res == false)
+        throw std::runtime_error("Could not attach OpenGL context");
+
+      fInterface = GrGLCreateNativeInterface();
+      if (fInterface == nullptr)
+        throw std::runtime_error("Could not create an OpenGL backend native interface");
+
+      fContext = GrContext::Create(kOpenGL_GrBackend, (GrBackendContext)fInterface);
+      if (fContext == nullptr)
+        throw std::runtime_error("Could not create an OpenGL backend");
+
+      fRenderTarget = setupRenderTarget(Width, Height); // render target has to be reset
+      fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+
+      ReleaseDC(hWnd, dc);
+
+      //setVsync(false);
+    }
+
+    int threadWidth = Width, threadHeight = Height;
+
+    while (true) {
+
+      std::unique_lock<std::mutex> lk(renderMutex);
+      while (!redrawNeeded) {
+        renderCV.wait(lk);
+        if (!redrawNeeded) {} // Spurious wakeup
+      }
+
+      if (!(Width > 0 && Height > 0))
+        continue; // Nonsense painting a 0 area
+
+      if (stopRendering == true)
+        return;
+
+      bool resizing = false;
+      if (Width != threadWidth || Height != threadHeight) {
+        // Area has been changed, we're resizing
+        resizing = true;
+      }
+
+      HDC dc = GetDC((HWND)hWnd);
+      auto res = wglMakeCurrent(dc, (HGLRC)fHGLRC);
+      if (res == false)
+        throw std::runtime_error("Could not attach OpenGL context");
+
+      if (Width != threadWidth || Height != threadHeight) {
+        fRenderTarget = setupRenderTarget(Width, Height); // render target has to be reset
+        fSurface.reset(SkSurface::MakeRenderTargetDirect(fRenderTarget, fSurfaceProps.get()).release());
+        threadWidth = Width;
+        threadHeight = Height;
+      }
+
+      // Call the OS-independent draw function
+      auto surfacePtr = fSurface->getCanvas();
+      this->draw(*surfacePtr);
+
+      if (stopRendering == true)
+        return;
+
+      //if (resizing) {
+      //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      // } else {
+
+
+
+      fContext->flush();
+      wglSwapLayerBuffers(dc, WGL_SWAP_MAIN_PLANE);
+      //glXSwapBuffers(fDisplay, fWin);
+
+      if (Width == threadWidth && Height == threadHeight) {// Check for size to be updated
+        redrawNeeded = false;
+      }
+
+      wglMakeCurrent(NULL, NULL);
+
+      //std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+      ReleaseDC(hWnd, dc);
+    }
+  }
+
   // BitBlt the rendered window into the device context
   void BaseOSWindow::paint(HDC hdc, bool aero) {
 
-    HDC hdcMem = CreateCompatibleDC(hdc);
-    
-    BITMAPINFO BMI;
-    memset(&BMI, 0, sizeof(BMI));
-    BMI.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    BMI.bmiHeader.biWidth = Bitmap.width();
-    BMI.bmiHeader.biHeight = -Bitmap.height(); // Bitmap are stored top-down
-    BMI.bmiHeader.biPlanes = 1;
-    BMI.bmiHeader.biBitCount = 32;
-    BMI.bmiHeader.biCompression = BI_RGB;
-    BMI.bmiHeader.biSizeImage = 0;
+    return;
 
-    void *pixels = Bitmap.getPixels();
-    HBITMAP bmp = CreateDIBSection(hdcMem, &BMI, DIB_RGB_COLORS, &pixels, NULL, NULL);
+    //HDC hdcMem = CreateCompatibleDC(hdc);
+    //
+    //BITMAPINFO BMI;
+    //memset(&BMI, 0, sizeof(BMI));
+    //BMI.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    //BMI.bmiHeader.biWidth = Bitmap.width();
+    //BMI.bmiHeader.biHeight = -Bitmap.height(); // Bitmap are stored top-down
+    //BMI.bmiHeader.biPlanes = 1;
+    //BMI.bmiHeader.biBitCount = 32;
+    //BMI.bmiHeader.biCompression = BI_RGB;
+    //BMI.bmiHeader.biSizeImage = 0;
 
-    SkASSERT(Bitmap.width() * Bitmap.bytesPerPixel() == Bitmap.rowBytes());
-    Bitmap.lockPixels();
-    SetDIBits(hdcMem, bmp, 0, Bitmap.height(),
-      Bitmap.getPixels(),
-      &BMI, DIB_RGB_COLORS);
+    //void *pixels = Bitmap.getPixels();
+    //HBITMAP bmp = CreateDIBSection(hdcMem, &BMI, DIB_RGB_COLORS, &pixels, NULL, NULL);
 
-    /* // Directly set pixels in the device context
-    SetDIBitsToDevice(hdcMem,
-      0, 0,
-      Bitmap.width(), Bitmap.height(),
-      0, 0,
-      0, Bitmap.height(),
-      Bitmap.getPixels(),
-      &BMI,
-      DIB_RGB_COLORS);*/
-    Bitmap.unlockPixels();
+    //SkASSERT(Bitmap.width() * Bitmap.bytesPerPixel() == Bitmap.rowBytes());
+    //Bitmap.lockPixels();
+    //SetDIBits(hdcMem, bmp, 0, Bitmap.height(),
+    //  Bitmap.getPixels(),
+    //  &BMI, DIB_RGB_COLORS);
 
-    HBITMAP oldBmp = (HBITMAP)SelectObject(hdcMem, bmp);
+    ///* // Directly set pixels in the device context
+    //SetDIBitsToDevice(hdcMem,
+    //  0, 0,
+    //  Bitmap.width(), Bitmap.height(),
+    //  0, 0,
+    //  0, Bitmap.height(),
+    //  Bitmap.getPixels(),
+    //  &BMI,
+    //  DIB_RGB_COLORS);*/
+    //Bitmap.unlockPixels();
 
-    BitBlt(hdc, 0, 0, Bitmap.width(), Bitmap.height(), hdcMem, 0, 0, SRCCOPY);
+    //HBITMAP oldBmp = (HBITMAP)SelectObject(hdcMem, bmp);
 
-    SelectObject(hdcMem, oldBmp);
+    //BitBlt(hdc, 0, 0, Bitmap.width(), Bitmap.height(), hdcMem, 0, 0, SRCCOPY);
 
-    DeleteDC(hdcMem);
-    DeleteObject(bmp);
+    //SelectObject(hdcMem, oldBmp);
+
+    //DeleteDC(hdcMem);
+    //DeleteObject(bmp);
   }
 
   void BaseOSWindow::resize(int width, int height) {

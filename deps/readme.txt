@@ -4,29 +4,7 @@ Compiling Skia with CMake
 Skia is precompiled (usually via CMake) in both debug and release static libraries.
 In order to compile Skia some "adjustments" have to take place:
 
-1) [seems fixed] X uses BGRA, therefore in skia/cmake/SkUserConfig.h.in it is necessary for linux systems to add
-
-    /*  Change the ordering to work in X windows.
-    */
-    #if ${SK_SAMPLES_FOR_X}
-      #define SK_R32_SHIFT    16
-      #define SK_G32_SHIFT    8
-      #define SK_B32_SHIFT    0
-      #define SK_A32_SHIFT    24
-    #endif
-
-and in skia/cmake/CMakeLists.txt the code to configure it
-
-    if (UNIX AND NOT APPLE)
-      set (SK_SAMPLES_FOR_X 1)
-    else()
-      set (SK_SAMPLES_FOR_X 0)
-    endif()
-
-This is in-place for the gyp build (look for SK_SAMPLES_FOR_X), not for the CMake one.
-This is NOT necessary for Windows (correct storage is already in place).
-
-2) [pending] For linux Jpeg, Gif and Png packages are not needed but they're included by CMake nonetheless,
+1) [pending] For linux Jpeg, Gif and Png packages are not needed but they're included by CMake nonetheless,
 
     #find_package (GIF)
     #find_package (JPEG)
@@ -34,30 +12,13 @@ This is NOT necessary for Windows (correct storage is already in place).
 
 Windows doesn't need to exclude these.
 
-3) [pending] By default Skia is configured by CMake as a shared library, make it static:
+2) [pending] By default Skia is configured by CMake as a shared library, make it static:
 
     add_library (skia STATIC ${srcs})
 
 Remember to update (if needed) the /deps/skia/include directory along with any .lib changes.
-
-4) [seems fixed] Defines might be missing, on Windows SK_BUILD_FOR_WIN32 is lacking at the time of writing this
-
-    list (APPEND public_defines   "-DSK_BUILD_FOR_WIN32")
-
-or some linux defines like
-
-    if (CMAKE_BUILD_TYPE STREQUAL Debug)
-      list (APPEND public_defines   "-DSK_DEBUG")
-    endif()
-
-and no SK_CPU_SSE_LEVEL is defined (therefore crashing at runtime if bitblitting SSE ops are performed)
-[fixed]
-    if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "amd64" OR
-        ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64")
-        list (APPEND public_defines   "-DSK_CPU_SSE_LEVEL=42") # TODO: implement a proper check
-    endif()
     
-5) [to be confirmed] It might also be necessary to define the GPU backend
+3) [to be confirmed] It might also be necessary to define the GPU backend
 
     # GPU backend
     add_definitions(-DSK_SUPPORT_GPU)
