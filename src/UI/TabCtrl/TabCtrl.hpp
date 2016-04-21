@@ -7,6 +7,8 @@
 #include <vector>
 #include <memory>
 #include <chrono>
+#include <map>
+#include <set>
 
 namespace varco {
 
@@ -31,6 +33,7 @@ namespace varco {
   private:
     TabCtrl *parent;
     std::string title;
+    int uniqueId;
     SkBitmap bitmap; // The tab will be rendered here
     bool dirty = true;
     SkPath path; // The path where clicks and inputs are accepted
@@ -57,23 +60,31 @@ namespace varco {
     void onLeftMouseDown(SkScalar x, SkScalar y);
     void onLeftMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
-    void addNewTab(std::string title, bool makeSelected = true); // TODO: return unique id!
+    // Adds a new tab and returns a unique identifier
+    int addNewTab(std::string title, bool makeSelected = true);
 
     bool isTrackingActive();
     void stopTracking();
 
   private:
     std::vector<Tab> tabs;
-    size_t selectedTab = -1; // The index of the selected tab
+    int selectedTabIndex = -1; // The position index of the selected tab
+
+    // Nb. there are two different kind of indices:
+    //  - Tab id -> this is unique for every tab and can never change
+    //  - Tab index -> this is the position of the tab in the control vector and might be change (swap)
+    // Users only deal with tab ids
+    std::map<int, int> tabId2tabIndexMap; // The tab_id->control_position_index map for the tabs
+    std::set<int> tabIdHoles; // The non-contiguous tab ids (left by deleted tabs)
 
     // Tracking section
     bool m_tracking = false; // Whether a tab is being tracked (dragged)
     SkScalar m_startXTrackingPosition;
-    void swapTabs(size_t tab1, size_t tab2);
+    void swapTabs(int tab1, int tab2);
 
     void recalculateTabsRects(); // Recalculates all the tabs rects (e.g. shrinks them in case the window got smaller)
     // Return true if the control needs redrawing
-    bool getAndDecreaseMovementOffsetForTab(size_t tab, SkScalar& movement);
+    bool getAndDecreaseMovementOffsetForTab(int tab, SkScalar& movement);
   };
 }
 

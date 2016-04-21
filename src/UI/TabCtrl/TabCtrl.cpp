@@ -166,9 +166,9 @@ namespace varco {
     UICtrlBase(parentWindow)
   {
     // DEBUG - add some tabs
-    tabs.emplace_back(this, "ALOTOFTEXTALOTOFTEXT");
-    tabs.emplace_back(this, "Second tab");
-    tabs.emplace_back(this, "Third tab");
+    //tabs.emplace_back(this, "ALOTOFTEXTALOTOFTEXT");
+    //tabs.emplace_back(this, "Second tab");
+    //tabs.emplace_back(this, "Third tab");
   }
   
   void TabCtrl::resize(SkRect rect) {
@@ -194,7 +194,7 @@ namespace varco {
     }
   }
 
-  bool TabCtrl::getAndDecreaseMovementOffsetForTab(size_t tab, SkScalar& movement) {
+  bool TabCtrl::getAndDecreaseMovementOffsetForTab(int tab, SkScalar& movement) {
     movement = tabs[tab].getMovementOffset();
     if (movement != 0.f) {
       // Decrease movement offset over time
@@ -248,23 +248,23 @@ namespace varco {
 #define TAB_SAFETY_OFFSET 20.5f // A safety offset from the swap point to prevent swap left-right fighting
 
     // Before rendering, check if a tracking is in progress and if a swap is needed
-    SkScalar selectedTabOffset = (selectedTab != -1) ? this->rect.fLeft + tabs[selectedTab].getOffset() + tabs[selectedTab].getTrackingOffset() : 0;
-    if (m_tracking == true && selectedTab != -1) {
+    SkScalar selectedTabOffset = (selectedTabIndex != -1) ? this->rect.fLeft + tabs[selectedTabIndex].getOffset() + tabs[selectedTabIndex].getTrackingOffset() : 0;
+    if (m_tracking == true && selectedTabIndex != -1) {
 
       bool swapped = false; // Only one swap (left OR right) is allowed per redraw cycle
 
-      if (selectedTab > 0) { // If there are tabs on the left and..
-        SkScalar leftTabEnd = this->rect.fLeft + tabs[selectedTab - 1].getOffset() + tabs[selectedTab - 1].getTrackingOffset() + tabsCurrentRect.width();
+      if (selectedTabIndex > 0) { // If there are tabs on the left and..
+        SkScalar leftTabEnd = this->rect.fLeft + tabs[selectedTabIndex - 1].getOffset() + tabs[selectedTabIndex - 1].getTrackingOffset() + tabsCurrentRect.width();
         if (selectedTabOffset + (tabsCurrentRect.width() / 2.0f) < leftTabEnd - TAB_SAFETY_OFFSET) { // ..if the center of the selected tab is inside another one
-          swapTabs(selectedTab, selectedTab - 1);
+          swapTabs(selectedTabIndex, selectedTabIndex - 1);
           swapped = true;
         }
       }
 
-      if (swapped == false && tabs.size() > selectedTab + 1) { // If there are tabs on the right and..
-        SkScalar rightTabBegin = this->rect.fLeft + tabs[selectedTab + 1].getOffset() + tabs[selectedTab + 1].getTrackingOffset();
+      if (swapped == false && tabs.size() > selectedTabIndex + 1) { // If there are tabs on the right and..
+        SkScalar rightTabBegin = this->rect.fLeft + tabs[selectedTabIndex + 1].getOffset() + tabs[selectedTabIndex + 1].getTrackingOffset();
         if (selectedTabOffset + (tabsCurrentRect.width() / 2.0f) > rightTabBegin + TAB_SAFETY_OFFSET) { // ..if the center of the selected tab is inside another one
-          swapTabs(selectedTab, selectedTab + 1);
+          swapTabs(selectedTabIndex, selectedTabIndex + 1);
         }
       }
 
@@ -275,7 +275,7 @@ namespace varco {
       Tab& tab = tabs[i];
       tab.setOffset(tabOffset);
       auto tabOffsetWithMovement = tabOffset;
-      if (i != selectedTab) { // Selected one is special and is tracked
+      if (i != selectedTabIndex) { // Selected one is special and is tracked
         SkScalar movementOffset = 0.f;
         auto needRedraw = getAndDecreaseMovementOffsetForTab(i, movementOffset);
         if (movementOffset != 0)
@@ -284,7 +284,7 @@ namespace varco {
           dirty = true;
       }
       tab.paint(); // Render the tab into its own buffer
-      if (i != selectedTab) // The selected one is drawn AFTER all the others
+      if (i != selectedTabIndex) // The selected one is drawn AFTER all the others
         canvas.drawBitmap(tab.getBitmap(), this->rect.fLeft + tabOffsetWithMovement, this->rect.fTop);
       tabOffset += this->tabsCurrentRect.width() - tabOverlapSize;
     }
@@ -302,19 +302,19 @@ namespace varco {
     //////////////////////////////////////////////////////////////////////
     // Now if there's a selected one, draw it last
     //////////////////////////////////////////////////////////////////////
-    if (selectedTab != -1) {
+    if (selectedTabIndex != -1) {
       // Recalculate selected tab offset (there might have been a swap)
       auto movementOrTrackingOffset = 0.0f;
       if (m_tracking == true)
-        movementOrTrackingOffset = tabs[selectedTab].getTrackingOffset();
+        movementOrTrackingOffset = tabs[selectedTabIndex].getTrackingOffset();
       else {
-        auto needRedraw = getAndDecreaseMovementOffsetForTab(selectedTab, movementOrTrackingOffset);
+        auto needRedraw = getAndDecreaseMovementOffsetForTab(selectedTabIndex, movementOrTrackingOffset);
         if (needRedraw)
           dirty = true;
       }
 
-      selectedTabOffset = this->rect.fLeft + tabs[selectedTab].getOffset() + movementOrTrackingOffset;
-      canvas.drawBitmap(tabs[selectedTab].getBitmap(), selectedTabOffset, this->rect.fTop);
+      selectedTabOffset = this->rect.fLeft + tabs[selectedTabIndex].getOffset() + movementOrTrackingOffset;
+      canvas.drawBitmap(tabs[selectedTabIndex].getBitmap(), selectedTabOffset, this->rect.fTop);
     }
 
     canvas.flush();
@@ -324,38 +324,41 @@ namespace varco {
       parentWindow.redraw(); // Schedule a redraw
   }
 
-  void TabCtrl::swapTabs(size_t tab1, size_t tab2) {
+  void TabCtrl::swapTabs(int tab1, int tab2) {
 
     // Adjust selected tab index and tracking offsets / movement offsets
     auto slideOffset = tabsCurrentRect.width() - tabOverlapSize;
-    size_t unselectedTab = (selectedTab == tab1 ? tab2 : tab1);
+    size_t unselectedTab = (selectedTabIndex == tab1 ? tab2 : tab1);
     // Swapped with a right unselected
-    if (selectedTab == tab1 && tab1 < tab2 || selectedTab == tab2 && tab2 < tab1) {
+    if (selectedTabIndex == tab1 && tab1 < tab2 || selectedTabIndex == tab2 && tab2 < tab1) {
 
       m_startXTrackingPosition += slideOffset;
-      tabs[selectedTab].trackingOffset -= slideOffset;
+      tabs[selectedTabIndex].trackingOffset -= slideOffset;
 
       // Transfer the previous position for the unselected tab in movement offset (accumulate on it)
-      tabs[unselectedTab].movementOffset += tabs[unselectedTab].getOffset() - tabs[selectedTab].getOffset();
+      tabs[unselectedTab].movementOffset += tabs[unselectedTab].getOffset() - tabs[selectedTabIndex].getOffset();
       tabs[unselectedTab].firstMovementTime = std::chrono::system_clock::now();
 
     } else { // swapped with a left unselected
 
       m_startXTrackingPosition -= slideOffset;
-      tabs[selectedTab].trackingOffset += slideOffset;
+      tabs[selectedTabIndex].trackingOffset += slideOffset;
 
       // Transfer the previous position for the unselected tab in movement offset (accumulate on it)
-      tabs[unselectedTab].movementOffset += tabs[unselectedTab].getOffset() - tabs[selectedTab].getOffset();
+      tabs[unselectedTab].movementOffset += tabs[unselectedTab].getOffset() - tabs[selectedTabIndex].getOffset();
       tabs[unselectedTab].firstMovementTime = std::chrono::system_clock::now();
 
     }
 
+    tabId2tabIndexMap[tabs[tab1].uniqueId] = tab2;
+    tabId2tabIndexMap[tabs[tab2].uniqueId] = tab1;
+
     std::swap(tabs[tab1], tabs[tab2]);
     
-    if (selectedTab == tab1)
-      selectedTab = tab2;      
-    else if (selectedTab == tab2)
-      selectedTab = tab1;
+    if (selectedTabIndex == tab1)
+      selectedTabIndex = tab2;      
+    else if (selectedTabIndex == tab2)
+      selectedTabIndex = tab1;
   }
 
   void TabCtrl::onLeftMouseDown(SkScalar x, SkScalar y) {
@@ -374,13 +377,13 @@ namespace varco {
         if (tab.getMovementOffset() != 0)
           return; // No dragging when returning to home position
 
-        if (selectedTab != i) { // Left click on the already selected tab won't trigger a "selected check"          
+        if (selectedTabIndex != i) { // Left click on the already selected tab won't trigger a "selected check"          
           redrawNeeded = true;
 
-          if (selectedTab != -1) // Deselect old selected tab
-            tabs[selectedTab].setSelected(false);
+          if (selectedTabIndex != -1) // Deselect old selected tab
+            tabs[selectedTabIndex].setSelected(false);
 
-          selectedTab = i;
+          selectedTabIndex = i;
           tab.setSelected(true);
         }
         
@@ -400,8 +403,8 @@ namespace varco {
     if (!m_tracking)
       return;
 
-    tabs[selectedTab].trackingOffset = x - m_startXTrackingPosition;
-    tabs[selectedTab].dirty = true;
+    tabs[selectedTabIndex].trackingOffset = x - m_startXTrackingPosition;
+    tabs[selectedTabIndex].dirty = true;
     this->dirty = true;
     parentWindow.redraw();
   }
@@ -410,13 +413,37 @@ namespace varco {
     stopTracking();
   }
 
-  void TabCtrl::addNewTab(std::string title, bool makeSelected) {    
-    if (selectedTab != -1) // Deselect old selected tab
-      tabs[selectedTab].setSelected(false);
+  int TabCtrl::addNewTab(std::string title, bool makeSelected) {    
+    if (makeSelected && selectedTabIndex != -1) // Deselect old selected tab
+      tabs[selectedTabIndex].setSelected(false);
+
     tabs.emplace_back(this, title);
-    tabs.back().setSelected(true);
-    selectedTab = tabs.size() - 1;
+
+    // Assign a free id to the tab (this is not the tab index in the control)
+    auto getFreeIdFromPool = [&](int tabIndex) {
+      if (tabIdHoles.begin() != tabIdHoles.end()) { // If there's a hole in the pool set, grab it and fill it
+        int id = *tabIdHoles.begin();
+        tabIdHoles.erase(tabIdHoles.begin());
+        tabId2tabIndexMap[id] = tabIndex;
+        return id;
+      } else { // else simply grab the next free id
+        int id = static_cast<int>(tabId2tabIndexMap.size());
+        tabId2tabIndexMap[id] = tabIndex;
+        return id;
+      }
+    };
+
+    auto newTabId = getFreeIdFromPool(static_cast<int>(tabs.size() - 1));
+    tabs.back().uniqueId = newTabId;
+
+    if (makeSelected) {
+      tabs.back().setSelected(true);
+      selectedTabIndex = static_cast<int>(tabs.size() - 1);
+    }
+
     this->parentWindow.redraw();
+
+    return newTabId;
   }
 
   bool TabCtrl::isTrackingActive() {
@@ -428,12 +455,12 @@ namespace varco {
     m_tracking = false;
 
     // Transfer the current tracking offset in movement offset (accumulate on it)
-    tabs[selectedTab].movementOffset += tabs[selectedTab].trackingOffset;
-    tabs[selectedTab].firstMovementTime = std::chrono::system_clock::now();
+    tabs[selectedTabIndex].movementOffset += tabs[selectedTabIndex].trackingOffset;
+    tabs[selectedTabIndex].firstMovementTime = std::chrono::system_clock::now();
 
-    tabs[selectedTab].trackingOffset = 0.0f;
+    tabs[selectedTabIndex].trackingOffset = 0.0f;
 
-    tabs[selectedTab].dirty = true;
+    tabs[selectedTabIndex].dirty = true;
     this->dirty = true;
     parentWindow.redraw();
   }

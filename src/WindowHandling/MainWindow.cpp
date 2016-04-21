@@ -14,7 +14,17 @@ namespace varco {
 #endif
       tabCtrl(*this),
       codeEditCtrl(*this)
-  {}
+  {
+    // DEBUG - Add some debug tabs
+    int id = tabCtrl.addNewTab("SimpleFile.cpp");
+    auto it = m_tabDocumentMap.insert(std::make_pair(id, std::make_unique<Document>(codeEditCtrl)));
+    //it.first->second->loadFromFile("../vectis/TestData/SimpleFile.cpp");
+    //it.first->second->applySyntaxHighlight(CPP);
+    //m_customCodeEdit->loadDocument(it.first->second.get());
+    
+    //tabCtrl.addNewTab("Second tab");
+    //tabCtrl.addNewTab("Third tab");
+  }
 
   // Main window drawing entry point
   void MainWindow::draw(SkCanvas& canvas) {

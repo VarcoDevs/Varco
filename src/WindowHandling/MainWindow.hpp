@@ -8,7 +8,10 @@
 #endif
 #include <UI/TabCtrl/TabCtrl.hpp>
 #include <UI/CodeEditCtrl/CodeEditCtrl.hpp>
+#include <Document/Document.hpp>
 #include <SkCanvas.h>
+#include <memory>
+#include <map>
 
 namespace varco {
 
@@ -31,6 +34,9 @@ namespace varco {
   private:
     TabCtrl tabCtrl;
     CodeEditCtrl codeEditCtrl;
+
+    // A map that stores the association between a tab and a document
+    std::map<int, std::unique_ptr<Document>> m_tabDocumentMap;
   };
 
 }
