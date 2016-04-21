@@ -6,7 +6,8 @@
 #elif defined __linux__
   #include <WindowHandling/BaseOSWindow_Linux.hpp>
 #endif
-#include <UI/TabCtrl.hpp>
+#include <UI/TabCtrl/TabCtrl.hpp>
+#include <UI/CodeEditCtrl/CodeEditCtrl.hpp>
 #include <SkCanvas.h>
 
 namespace varco {
@@ -29,6 +30,7 @@ namespace varco {
 
   private:
     TabCtrl tabCtrl;
+    CodeEditCtrl codeEditCtrl;
   };
 
 }

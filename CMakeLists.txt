@@ -107,8 +107,14 @@ list (APPEND SRCS ${WINDOWHANDLING_SRCS})
 source_group (WindowHandling FILES ${WINDOWHANDLING_SRCS})
 
 set (UI_SRCS
-            src/UI/TabCtrl.cpp
-            src/UI/TabCtrl.hpp)
+			src/UI/UICtrlBase.cpp
+			src/UI/UICtrlBase.hpp
+            src/UI/TabCtrl/TabCtrl.cpp
+            src/UI/TabCtrl/TabCtrl.hpp
+            src/UI/ScrollBar/ScrollBar.cpp
+            src/UI/ScrollBar/ScrollBar.hpp
+            src/UI/CodeEditCtrl/CodeEditCtrl.cpp
+            src/UI/CodeEditCtrl/CodeEditCtrl.hpp)
 list (APPEND SRCS ${UI_SRCS})
 source_group (UI FILES ${UI_SRCS})
 
@@ -122,6 +128,12 @@ if (WIN32)
 endif()
 list (APPEND SRCS ${UTILS_SRCS})
 source_group (Utils FILES ${UTILS_SRCS})
+
+set (DOCUMENT_SRCS
+            src/Document/Document.cpp
+            src/Document/Document.hpp)
+list (APPEND SRCS ${DOCUMENT_SRCS})
+source_group (Document FILES ${DOCUMENT_SRCS})
 
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})

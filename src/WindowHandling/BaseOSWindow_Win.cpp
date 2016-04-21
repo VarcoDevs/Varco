@@ -168,10 +168,17 @@ namespace varco {
 
     MSG Msg;
     while (GetMessage(&Msg, NULL, 0, 0) > 0) {
+
       TranslateMessage(&Msg);
       DispatchMessage(&Msg);
+
+      if (stopRendering) { // Wake up rendering thread at the next iteration and let him exit
+        std::unique_lock<std::mutex> lk(renderMutex);
+        renderCV.notify_one();
+        break;
+      }
     }
-    renderThread.detach();
+    renderThread.join(); // Wait for rendering thread to exit spontaneously
     return static_cast<int>(Msg.wParam);
   }
 
@@ -193,6 +200,8 @@ namespace varco {
 
       case WM_CLOSE: {
         DestroyWindow(hWnd);
+        stopRendering = true;
+        return 0;
       } break;
 
       case WM_DESTROY: {
@@ -297,16 +306,16 @@ namespace varco {
     while (true) {
 
       std::unique_lock<std::mutex> lk(renderMutex);
-      while (!redrawNeeded) {
+      while (!redrawNeeded && !stopRendering) {
         renderCV.wait(lk);
-        if (!redrawNeeded) {} // Spurious wakeup
+        if (!redrawNeeded && !stopRendering) {} // Spurious wakeup
       }
-
-      if (!(Width > 0 && Height > 0))
-        continue; // Nonsense painting a 0 area
 
       if (stopRendering == true)
         return;
+
+      if (!(Width > 0 && Height > 0))
+        continue; // Nonsense painting a 0 area      
 
       bool resizing = false;
       if (Width != threadWidth || Height != threadHeight) {

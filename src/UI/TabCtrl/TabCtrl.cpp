@@ -1,6 +1,7 @@
 #include <WindowHandling/MainWindow.hpp>
-#include <UI/TabCtrl.hpp>
+#include <UI/TabCtrl/TabCtrl.hpp>
 #include <Utils/Utils.hpp>
+#include <SkCanvas.h>
 #include <SkTypeface.h>
 #include <SkGradientShader.h>
 #include <algorithm>
@@ -162,7 +163,7 @@ namespace varco {
   }
 
   TabCtrl::TabCtrl(MainWindow& parentWindow) :
-    parentWindow(parentWindow)
+    UICtrlBase(parentWindow)
   {
     // DEBUG - add some tabs
     tabs.emplace_back(this, "ALOTOFTEXTALOTOFTEXT");
@@ -171,12 +172,10 @@ namespace varco {
   }
   
   void TabCtrl::resize(SkRect rect) {
-    if (this->rect != rect) {
-      this->rect = rect;
-      this->bitmap.allocPixels(SkImageInfo::Make((int)rect.width(), (int)rect.height(), kN32_SkColorType, kPremul_SkAlphaType));
-      dirty = true;
+    UICtrlBase::resize(rect); // Call base class first
+
+    if (this->dirty)
       recalculateTabsRects();
-    }
   }
 
   void TabCtrl::recalculateTabsRects() {
@@ -213,15 +212,7 @@ namespace varco {
       return true; // Also needs a redraw
     }
     return false;
-  }
-
-  SkBitmap& TabCtrl::getBitmap() {
-    return this->bitmap;
-  }
-
-  SkRect TabCtrl::getRect() {
-    return this->rect;
-  }
+  }  
 
   void TabCtrl::paint() {
 

@@ -1,8 +1,7 @@
 #ifndef VARCO_TABCTRL_HPP
 #define VARCO_TABCTRL_HPP
 
-#include <SkCanvas.h>
-#include <SkBitmap.h>
+#include <UI/UICtrlBase.hpp>
 #include <SkPath.h>
 #include <string>
 #include <vector>
@@ -11,8 +10,7 @@
 
 namespace varco {
 
-  class TabCtrl;
-  class MainWindow;
+  class TabCtrl;  
 
   class Tab { // Represents a tab inside the tab control
     friend class TabCtrl;
@@ -44,7 +42,7 @@ namespace varco {
     bool selected = false; // Is this a selected tab?
   };
 
-  class TabCtrl { // The main tab control
+  class TabCtrl : public UICtrlBase { // The main tab control
     friend class Tab;
     // Initialization values for all the tabs in this control
     const SkScalar TAB_MAX_WIDTH = 150.0;
@@ -54,10 +52,8 @@ namespace varco {
   public:
     TabCtrl(MainWindow& parentWindow);
     
-    void resize(SkRect rect); // Set the new rect where the control will redraw itself
-    SkBitmap& getBitmap();
-    SkRect getRect();
-    void paint(); // Paint the control in the bitmap
+    void resize(SkRect rect) override; // Set the new rect where the control will redraw itself    
+    void paint() override; // Paint the control in the bitmap
     void onLeftMouseDown(SkScalar x, SkScalar y);
     void onLeftMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
@@ -67,10 +63,6 @@ namespace varco {
     void stopTracking();
 
   private:
-    MainWindow& parentWindow;
-    SkRect rect; // Rect where to draw the control, relative to the client area of the parent
-    SkBitmap bitmap; // The entire control will be rendered here
-    bool dirty = true;
     std::vector<Tab> tabs;
     size_t selectedTab = -1; // The index of the selected tab
 
