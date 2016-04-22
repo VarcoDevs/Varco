@@ -109,19 +109,20 @@ source_group (WindowHandling FILES ${WINDOWHANDLING_SRCS})
 set (UI_SRCS
 			src/UI/UICtrlBase.cpp
 			src/UI/UICtrlBase.hpp
-            src/UI/TabCtrl/TabCtrl.cpp
-            src/UI/TabCtrl/TabCtrl.hpp
+            src/UI/TabBar/TabBar.cpp
+            src/UI/TabBar/TabBar.hpp
             src/UI/ScrollBar/ScrollBar.cpp
             src/UI/ScrollBar/ScrollBar.hpp
-            src/UI/CodeEditCtrl/CodeEditCtrl.cpp
-            src/UI/CodeEditCtrl/CodeEditCtrl.hpp)
+            src/UI/CodeView/CodeView.cpp
+            src/UI/CodeView/CodeView.hpp)
 list (APPEND SRCS ${UI_SRCS})
 source_group (UI FILES ${UI_SRCS})
 
 set (UTILS_SRCS
             src/Utils/Commons.hpp
             src/Utils/Utils.hpp
-            src/Utils/VKeyCodes.hpp)
+            src/Utils/VKeyCodes.hpp
+            src/Utils/Concurrent.hpp)
 if (WIN32)
   list (APPEND UTILS_SRCS src/Utils/WGL.hpp
                           src/Utils/WGL.cpp)

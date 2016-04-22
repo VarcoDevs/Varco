@@ -1,39 +1,38 @@
 #include <UI/UICtrlBase.hpp>
+#include <SkRect.h>
 
 namespace varco {
 
-  UICtrlBase::UICtrlBase(MainWindow& parentWindow) :
-    parentWindow(parentWindow)
+  UICtrlBase::UICtrlBase(UIContainer& parentContainer) :
+    m_parentContainer(parentContainer)
   {}
 
   void UICtrlBase::resize(SkRect rect) {
-    if (this->rect != rect) {
-      this->rect = rect;
+    if (m_rect != rect) {
+      m_rect = rect;
 
       // This adjustment is necessary since the control needs not to know anything about its
       // relative position on its parent. It always starts drawing its bitmap at top-left 0;0
-      this->rect.fRight -= this->rect.fLeft;
-      this->rect.fBottom -= this->rect.fTop;
-      this->rect.fLeft = 0;
-      this->rect.fTop = 0;
-
-      this->bitmap.allocPixels(SkImageInfo::Make((int)rect.width(), (int)rect.height(), 
-                                                 kN32_SkColorType, kPremul_SkAlphaType));
-      this->dirty = true;
+      m_bitmap.allocPixels(SkImageInfo::Make((int)(m_rect.fRight - m_rect.fLeft), 
+                           (int)(m_rect.fBottom - m_rect.fTop), kN32_SkColorType, kPremul_SkAlphaType));
+      m_dirty = true;
     }
   }
 
   SkBitmap& UICtrlBase::getBitmap() {
-    return this->bitmap;
+    return m_bitmap;
   }
 
-  SkRect UICtrlBase::getRect() {
-    return this->rect;
+  SkRect UICtrlBase::getRect(RectType type) {
+    switch (type) {
+      case relativeToParentRect: {
+        return m_rect;
+      } break;
+      case absoluteRect: {
+        return SkRect::MakeLTRB(0, 0, (SkScalar)m_bitmap.width(), (SkScalar)m_bitmap.height());
+      } break;
+    }
+    return m_rect;
   }
-
-
-
-
-
 
 }

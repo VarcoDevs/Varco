@@ -5,18 +5,27 @@
 
 namespace varco {
 
-  class MainWindow;
+  // Every container of controls should implement redraw() to be called by one of its subcontrols
+  class UIContainer {
+  public:
+    virtual ~UIContainer() = default;
+    virtual void redraw() {}
+    virtual void startMouseCapture() {}
+  };
+
+
 
   // Every Varco UI control derives from this class which holds common data
   // and methods for painting and resizing purposes
   class UICtrlBase {
   protected:
-    UICtrlBase(MainWindow& parentWindow); // Should not be instantiated directly
+    UICtrlBase(UIContainer& parentContainer); // Should not be instantiated directly
+    virtual ~UICtrlBase() = default;
 
-    MainWindow& parentWindow;
-    SkRect rect; // Rect where to draw the control, relative to the client area of the parent
-    SkBitmap bitmap; // The entire control will be rendered here
-    bool dirty = true;
+    UIContainer& m_parentContainer;
+    SkRect m_rect; // Rect where to draw the control, relative to the client area of the parent
+    SkBitmap m_bitmap; // The entire control will be rendered here
+    bool m_dirty = true;
 
   public:
 
@@ -24,7 +33,9 @@ namespace varco {
     virtual void paint() = 0;
     
     SkBitmap& getBitmap();
-    SkRect getRect();
+
+    enum RectType {relativeToParentRect, absoluteRect};
+    SkRect getRect(RectType type = relativeToParentRect);
   };
 
 }

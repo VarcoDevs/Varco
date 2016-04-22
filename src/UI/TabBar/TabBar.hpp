@@ -12,12 +12,12 @@
 
 namespace varco {
 
-  class TabCtrl;  
+  class TabBar;  
 
   class Tab { // Represents a tab inside the tab control
-    friend class TabCtrl;
+    friend class TabBar;
   public:
-    Tab(TabCtrl *parent, std::string title);
+    Tab(TabBar *parent, std::string title);
 
     // Paint the tab into its own bitmap
     void paint();
@@ -31,7 +31,7 @@ namespace varco {
     SkScalar getTrackingOffset();
 
   private:
-    TabCtrl *parent;
+    TabBar *parent;
     std::string title;
     int uniqueId;
     SkBitmap bitmap; // The tab will be rendered here
@@ -45,7 +45,7 @@ namespace varco {
     bool selected = false; // Is this a selected tab?
   };
 
-  class TabCtrl : public UICtrlBase { // The main tab control
+  class TabBar : public UICtrlBase { // The main tab control
     friend class Tab;
     // Initialization values for all the tabs in this control
     const SkScalar TAB_MAX_WIDTH = 150.0;
@@ -53,7 +53,7 @@ namespace varco {
     const SkScalar tabOverlapSize = 20.0f; // The amount of overlap between two adjacent tabs
     SkRect tabsCurrentRect = SkRect::MakeLTRB(0, 0, TAB_MAX_WIDTH, 33.0); // The rect that encloses the tab (coords relative to the tab control)
   public:
-    TabCtrl(MainWindow& parentWindow);
+    TabBar(UIContainer& parentWindow);
     
     void resize(SkRect rect) override; // Set the new rect where the control will redraw itself    
     void paint() override; // Paint the control in the bitmap
