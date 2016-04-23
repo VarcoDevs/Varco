@@ -68,7 +68,6 @@ namespace varco {
       std::string restOfLine;
       std::vector<EditorLine> edLines;
       edLines.reserve(10); // Should be enough for every splitting
-      DebugBreak();
       if (m_wrapWidth != -1 && // Also check if the monospace'd width isn't exceeding the viewport
         line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidth) {
         // We have a wrap and the line is too big - WRAP IT

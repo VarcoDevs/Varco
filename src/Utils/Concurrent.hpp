@@ -9,6 +9,8 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <map>
+#include <future>
 
 #include <sstream> // DEBUG
 
@@ -79,7 +81,22 @@ namespace varco {
       "Reduce parameters don't match / incompatible with accumulator type"
       );
    
-    using Iterator = typename Sequence::const_iterator;
+    using SequenceIterator = typename Sequence::const_iterator;
+    static_assert(
+      std::is_same<
+        std::iterator_traits<SequenceIterator>::iterator_category,
+        std::random_access_iterator_tag
+      >::value,
+      "Sequence hasn't random access iterators"
+      );
+    using AccumulatorIterator = typename Sequence::const_iterator;
+    static_assert(
+      std::is_same<
+        std::iterator_traits<AccumulatorIterator>::iterator_category,
+        std::random_access_iterator_tag
+      >::value,
+      "Accumulator hasn't random access iterators"
+      );
 
     if (sequence.size() == 0)
       return Accumulator{};
@@ -100,100 +117,46 @@ namespace varco {
       break;
     }
 
-    std::mutex mtx;
-    std::condition_variable cv;
-    std::mutex mtx_reduction;
-    std::condition_variable cv_reduction;
-    std::atomic_ullong syncIndex;
-    syncIndex.store(0, std::memory_order_relaxed);
-    std::atomic_bool syncFlag = false;
-    bool reductionFlag = false;
+    std::mutex barrier_mutex;
 
-    prototype_traits<Map>::return_type result;
+    Accumulator result;
+    std::map<size_t, Accumulator> threads_partials_map;
+    std::vector<std::promise<void>> threads_promises;
+    std::vector<std::future<void>> threads_futures;
 
-    auto threadDispatcher = [&](size_t threadId, size_t start, size_t end) {
+    auto threadDispatcher = [&](size_t threadId, size_t start, size_t end) 
+    {
       prototype_traits<Map>::return_type thread_partials;
       for (size_t i = start; i < end; ++i) {
         auto intermediate = map(sequence[i]);
         reduce(thread_partials, intermediate);
       }
 
-      // Sync barrier
+      // ~-~-~-~-~-~-~-~-~ Sync barrier ~-~-~-~-~-~-~-~-~
       {
-        std::unique_lock<std::mutex> lck(mtx);
-        ++syncIndex;
-        
-        std::stringstream ss;
-        ss << "Thread " << threadId << " just finished its first phase!\n";
-        OutputDebugString(ss.str().c_str());
-
-        cv.notify_all();
-      }
-
-      std::unique_lock<std::mutex> lck(mtx);
-      bool allThreadsSyncd = syncFlag.load(std::memory_order_relaxed);
-      size_t currentIndex = syncIndex.load(std::memory_order_relaxed);
-      while (!(allThreadsSyncd && currentIndex == threadId)) {
-        cv.wait(lck, [&]() {
-          allThreadsSyncd = syncFlag.load(std::memory_order_relaxed);
-          currentIndex = syncIndex.load(std::memory_order_relaxed);
-          return allThreadsSyncd && currentIndex == threadId;
-        });
-        // if (condition_is_false) {} // Spurious wakeup
-      }
-
-      std::stringstream ss;
-      ss << "Thread " << threadId << " woken up, now reducing!\n";
-      OutputDebugString(ss.str().c_str());
-
-      // Main reduction
-      reduce(result, thread_partials);
-      std::unique_lock<std::mutex> lck_red(mtx_reduction);
-      reductionFlag = true;
-      cv_reduction.notify_one();
+        std::unique_lock<std::mutex> lock(barrier_mutex);
+        threads_partials_map.emplace(threadId, thread_partials);
+        threads_promises[threadId].set_value();
+      }      
     };
 
     std::vector<std::thread> threads;
     for (size_t i = 0; i < numThreads; ++i) {
       size_t start = i * mapsPerThread;
       size_t end = std::min(sequence.size(), start + mapsPerThread);
-      threads.emplace_back(threadDispatcher, i, start, end);      
+      threads_promises.emplace_back();
+      threads_futures.emplace_back(threads_promises.back().get_future());
+      threads.emplace_back(threadDispatcher, i, start, end);
     }
 
-    std::unique_lock<std::mutex> lck(mtx);
-    size_t currentIndex = syncIndex.load(std::memory_order_relaxed);
-    while (currentIndex < numThreads) {
-      cv.wait(lck, [&]() {
-        currentIndex = syncIndex.load(std::memory_order_relaxed);
-        return currentIndex == numThreads;
-      });
-      // if (currentIndex < numThreads) {} // Spurious wakeup
-    }
+    for (auto& future : threads_futures)
+      future.wait();
 
-    std::stringstream ss;
-    ss << "[MAIN] ALL THREADS HAVE SYNC'D!!!\n";
-    OutputDebugString(ss.str().c_str());
-
-    // All threads sync'd
-    syncFlag.store(true, std::memory_order_relaxed);
-    lck.unlock();
     for (size_t i = 0; i < numThreads; ++i) {
-      syncIndex.store(i);
-      cv.notify_all();
-      std::unique_lock<std::mutex> lck_red(mtx_reduction);
-      while (!reductionFlag) {
-        cv_reduction.wait(lck_red, [&]() {
-          return reductionFlag;
-        });
-        // if (!reductionFlag) {} // Spurious wakeup
-      }
-      reductionFlag = false;
+      std::copy(threads_partials_map[i].begin(), threads_partials_map[i].end(),
+                std::back_inserter(result)); 
     }
 
-    ss.str("");
-    ss << "[MAIN] ALL THREADS HAVE REDUCED!!!\n";
-    OutputDebugString(ss.str().c_str());
-    
     for (auto& thread : threads)
       thread.join();
 

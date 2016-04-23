@@ -29,6 +29,7 @@ namespace varco {
     PhysicalLine(EditorLine&& editorLine) {
       m_editorLines.emplace_back(std::forward<EditorLine>(editorLine));
     }
+    PhysicalLine(const PhysicalLine&) = default;
     PhysicalLine() = default;
 
     std::vector<EditorLine> m_editorLines;
