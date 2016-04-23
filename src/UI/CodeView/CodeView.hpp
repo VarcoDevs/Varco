@@ -26,7 +26,7 @@ namespace varco {
     Document *m_document = nullptr;
     std::unique_ptr<ScrollBar> m_verticalScrollBar;
     SkTypeface *m_typeface = nullptr; // Font used throughout the control
-    int m_characterWidthPixels;
+    int m_characterWidthPixels, m_characterHeightPixels;
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
                                       // documents as soon as the first resize happens
   };

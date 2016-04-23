@@ -26,7 +26,8 @@ namespace varco {
       paintTemp.setLCDRenderText(true);
       paintTemp.setTypeface(m_typeface);
       SkScalar width = paintTemp.measureText("A", 1);
-      m_characterWidthPixels = static_cast<int>(width);
+      m_characterWidthPixels = static_cast<int>(width);      
+      m_characterHeightPixels = static_cast<int>(paintTemp.getFontSpacing());
     }
   }
 
@@ -81,7 +82,8 @@ namespace varco {
 
     //  m_verticalScrollBar->setSliderPosition(0);
 
-    //  this->viewport()->repaint(); // Trigger a cache invalidation for the viewport (necessary)
+    m_dirty = true;
+    paint(); // Trigger a cache invalidation for the viewport (necessary)
   }
 
   int CodeView::getCharacterWidthPixels() const {
@@ -124,6 +126,61 @@ namespace varco {
 
     if (m_document == nullptr)
       return; // Nothing to display
+
+    struct {
+      float x;
+      float y;
+    } startpoint = { 5, 20 };
+
+    size_t documentRelativePos = 0;
+    size_t lineRelativePos = 0;
+
+    SkPaint textPaint;
+    textPaint.setColor(SK_ColorWHITE);
+    textPaint.setAlpha(255);
+    textPaint.setTextSize(SkIntToScalar(11));
+    textPaint.setAntiAlias(true);
+    textPaint.setLCDRenderText(true);
+    textPaint.setTypeface(m_typeface);
+
+    // Implement the main rendering loop algorithm which renders characters segment by segment
+    // on the viewport area
+    for (auto& pl : m_document->m_physicalLines) {
+
+      size_t editorLineIndex = 0; // This helps tracking the last EditorLine of a PhysicalLine
+      for (auto& el : pl.m_editorLines) {
+        ++editorLineIndex;
+
+        do {
+          startpoint.x = 5.f + lineRelativePos * m_characterWidthPixels;
+
+
+            // Multiple lines will have to be rendered, just render this till the end and continue
+
+            int charsRendered = 0;
+            if (el.m_characters.size() > 0) { // Empty lines must be skipped
+              std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
+
+              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, textPaint);
+              //painter.drawText(tpoint, ts);
+              charsRendered = (int)ts.size();
+            }
+
+            lineRelativePos = 0; // Next editor line will just start from the beginning
+            documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
+              (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
+
+            break; // Go and fetch a new line for the next cycle
+
+        } while (true);
+
+        // Move the rendering cursor (carriage-return)
+        startpoint.y = startpoint.y + m_characterHeightPixels;
+      }
+    }
+
+
+    canvas.flush();
 
   }
 

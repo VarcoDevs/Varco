@@ -43,7 +43,7 @@ namespace varco {
     typename Reduce
   >
   Accumulator blockingOrderedMapReduce(const Sequence& sequence, const Map& map, 
-                                       const Reduce& reduce) 
+                                       const Reduce& reduce, const size_t maps_per_threads_hint = 20U) 
   {
     static_assert(
       prototype_traits<Map>::arity == 1 &&
@@ -98,7 +98,7 @@ namespace varco {
       return Accumulator{};
 
     auto numThreads = std::max(1U, std::thread::hardware_concurrency());
-    size_t minMapsPerThread = 5U;
+    size_t minMapsPerThread = maps_per_threads_hint;
 
     size_t mapsPerThread;
     while(true) {
@@ -158,7 +158,6 @@ namespace varco {
 
     return result;
   }
-
 
 }
 

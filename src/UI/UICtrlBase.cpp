@@ -8,7 +8,7 @@ namespace varco {
   {}
 
   void UICtrlBase::resize(SkRect rect) {
-    if (m_rect != rect) {
+    if (m_rect != rect && rect.fTop < rect.fBottom && rect.fLeft < rect.fRight) {
       m_rect = rect;
 
       // This adjustment is necessary since the control needs not to know anything about its
