@@ -7,12 +7,8 @@
 #include <tuple>
 #include <functional>
 #include <mutex>
-#include <condition_variable>
-#include <atomic>
-#include <map>
 #include <future>
-
-#include <sstream> // DEBUG
+#include <map>
 
 namespace varco {
 
