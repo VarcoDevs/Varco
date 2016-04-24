@@ -1,7 +1,7 @@
 #ifndef VARCO_TABCTRL_HPP
 #define VARCO_TABCTRL_HPP
 
-#include <UI/UICtrlBase.hpp>
+#include <UI/UIElement.hpp>
 #include <SkPath.h>
 #include <string>
 #include <vector>

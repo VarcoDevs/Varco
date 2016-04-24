@@ -107,8 +107,8 @@ list (APPEND SRCS ${WINDOWHANDLING_SRCS})
 source_group (WindowHandling FILES ${WINDOWHANDLING_SRCS})
 
 set (UI_SRCS
-			    src/UI/UICtrlBase.cpp
-			    src/UI/UICtrlBase.hpp
+			    src/UI/UIElement.cpp
+			    src/UI/UIElement.hpp
           src/UI/TabBar/TabBar.cpp
           src/UI/TabBar/TabBar.hpp
           src/UI/ScrollBar/ScrollBar.cpp

@@ -4,8 +4,8 @@
 
 namespace varco {
 
-  ScrollBar::ScrollBar(UIElement<ui_container_tag>& codeView)
-    : UIElement(codeView),
+  ScrollBar::ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView)
+    : m_parentControlContainer(codeView), UIElement(codeView),
       m_textLineHeight(1), // Height of every line, it depends on the font used (although it's always monospaced)
       m_internalLineCount(1) // How many lines are actually in the document
   {}
@@ -13,13 +13,11 @@ namespace varco {
   // Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active
   void ScrollBar::documentSizeChanged(const int width_characters, const int height_lines, const SkScalar lineHeight) {
 
-    m_textLineHeight = lineHeight; // textLine.height();
+    m_textLineHeight = lineHeight;
     
-
-//    auto codeViewHeight = static_cast<UICtrlBase>(m_parentContainer).getRect(absoluteRect).height();
+    auto codeViewHeight = m_parentControlContainer.getRect(absoluteRect).height();
     // Update the maximum number of visible lines in the text control, this might have changed
- //   m_maxViewVisibleLines = std::floor(codeViewHeight / m_textLineHeight);
-
+    m_maxViewVisibleLines = static_cast<int>(codeViewHeight / m_textLineHeight);
   }
 
   // The fundamental equation to repaint the scrollbar is:

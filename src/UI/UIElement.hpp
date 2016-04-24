@@ -1,20 +1,9 @@
-#ifndef VARCO_UICTRLBASE_HPP
-#define VARCO_UICTRLBASE_HPP
+#ifndef VARCO_UIELEMENT_HPP
+#define VARCO_UIELEMENT_HPP
 
 #include <SkBitmap.h>
 
 namespace varco {
-
-
-  // Every container of others UI controls should implement redraw() to be called by one of its subcontrols.
-  // Other events are optionally overridden.
-  class UIContainer {
-  public:
-    virtual ~UIContainer() = default;
-    virtual void redraw() = 0;
-    virtual void startMouseCapture() {}
-  };
-
 
   // Tag dispatching
   struct ui_container_tag {}; // This UI element is tagged to contain other UI elements
@@ -25,8 +14,8 @@ namespace varco {
   template<typename... Tag>
   struct UIElement {};
 
-  template<typename... Tag>
-  class UIElement <ui_container_tag, Tag...> : public UIElement<Tag...> {
+  template<>
+  class UIElement<ui_container_tag> {
   public:
     using tag_container = ui_container_tag;
 
@@ -36,11 +25,11 @@ namespace varco {
     virtual void startMouseCapture() {} // Might be requested by child controls
   };
 
-  template<typename... Tag>
-  class UIElement <ui_control_tag, Tag...> : public UIElement<Tag...> {
+  template<>
+  class UIElement<ui_control_tag> {
   protected:
 
-    UIElement(UIElement<ui_container_tag>& parentContainer) : // Should not be instantiated directly
+    explicit UIElement(UIElement<ui_container_tag>& parentContainer) : // Should not be instantiated directly
       m_parentContainer(parentContainer) {}
 
     virtual ~UIElement() = default;
@@ -51,6 +40,8 @@ namespace varco {
     bool m_dirty = true;
 
   public:
+
+    using tag_control = ui_container_tag;
 
     virtual void resize(SkRect rect) {
       if (m_rect != rect && rect.fTop < rect.fBottom && rect.fLeft < rect.fRight) {
@@ -64,7 +55,7 @@ namespace varco {
       }
     }
 
-    virtual void paint() = 0;    
+    virtual void paint() = 0;
 
     SkBitmap& getBitmap() {
       return m_bitmap;
@@ -73,19 +64,33 @@ namespace varco {
     enum RectType { relativeToParentRect, absoluteRect };
     SkRect getRect(RectType type = relativeToParentRect) {
       switch (type) {
-      case relativeToParentRect: {
-        return m_rect;
-      } break;
-      case absoluteRect: {
-        return SkRect::MakeLTRB(0, 0, (SkScalar)m_bitmap.width(), (SkScalar)m_bitmap.height());
-      } break;
+        case relativeToParentRect: {
+          return m_rect;
+        } break;
+        case absoluteRect: {
+          return SkRect::MakeLTRB(0, 0, (SkScalar)m_bitmap.width(), (SkScalar)m_bitmap.height());
+        } break;
       }
       return m_rect;
     }
   };
 
-  
+  template<typename... Tag>
+  struct UIElement <ui_container_tag, Tag...> : public UIElement<ui_container_tag>, public UIElement<Tag...> {
 
+    template<typename... Args>
+    explicit UIElement(Args&& ...args) : UIElement<Tag...>(std::forward<Args>(args)...) {}
+    
+  };
+
+  template<typename... Tag>
+  struct UIElement <ui_control_tag, Tag...> : public UIElement<ui_control_tag>, public UIElement<Tag...> {
+
+    template<typename... Args>
+    explicit UIElement(UIElement<ui_container_tag>& arg, Args&& ...args) :
+      UIElement<ui_control_tag>(arg), UIElement<Tag...>(std::forward<Args>(args)...) {}
+
+  };
 }
 
-#endif // VARCO_UICTRLBASE_HPP
+#endif // VARCO_UIELEMENT_HPP

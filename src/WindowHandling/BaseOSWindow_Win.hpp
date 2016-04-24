@@ -29,7 +29,7 @@ namespace varco {
     int show();
     
     virtual void draw(SkCanvas& canvas) = 0;
-    void redraw();
+    void repaint();
     virtual void onLeftMouseDown(SkScalar x, SkScalar y) = 0;
     virtual void onLeftMouseMove(SkScalar x, SkScalar y) = 0;
     void startMouseCapture();

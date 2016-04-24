@@ -1,7 +1,7 @@
 #ifndef VARCO_CODEEDITCTRL_HPP
 #define VARCO_CODEEDITCTRL_HPP
 
-#include <UI/UICtrlBase.hpp>
+#include <UI/UIElement.hpp>
 #include <UI/ScrollBar/ScrollBar.hpp>
 #include <Document/Document.hpp>
 #include <SkPaint.h>
@@ -11,7 +11,7 @@ class SkTypeface;
 
 namespace varco {
 
-  class CodeView : public UIElement<ui_control_tag, ui_container_tag> { // The main code edit control
+  class CodeView : public UIElement<ui_container_tag, ui_control_tag> { // The main code edit control
   public:
     CodeView(UIElement<ui_container_tag>& parentContainer);
 

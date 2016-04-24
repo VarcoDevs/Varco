@@ -272,7 +272,7 @@ namespace varco {
     TrackMouseEvent(&tme);
   }
 
-  void BaseOSWindow::redraw() {
+  void BaseOSWindow::repaint() {
     InvalidateRect(this->hWnd, nullptr, FALSE); // Send a WM_PAINT
   }
 
