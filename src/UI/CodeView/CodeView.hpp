@@ -13,10 +13,11 @@ namespace varco {
 
   class CodeView : public UIElement<ui_control_tag, ui_container_tag> { // The main code edit control
   public:
-    CodeView(UIElement<ui_container_tag>& parentWindow);
+    CodeView(UIElement<ui_container_tag>& parentContainer);
 
     void resize(SkRect rect) override;
     void paint() override;
+    void repaint() override;
 
     void loadDocument(Document& doc);
     int getCharacterWidthPixels() const;
@@ -32,7 +33,7 @@ namespace varco {
 
     int m_characterWidthPixels, m_characterHeightPixels;
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
-                                      // documents as soon as the first resize happens
+                                                             // documents as soon as the first resize happens
   };
 
 }

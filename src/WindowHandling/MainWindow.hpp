@@ -24,6 +24,7 @@ namespace varco {
 #endif
 
     void draw(SkCanvas& canvas) override;
+    void repaint() override;
     void onLeftMouseDown(SkScalar x, SkScalar y) override;
     void onLeftMouseMove(SkScalar x, SkScalar y) override;
     void onMouseLeave();

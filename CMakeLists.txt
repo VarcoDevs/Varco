@@ -107,14 +107,14 @@ list (APPEND SRCS ${WINDOWHANDLING_SRCS})
 source_group (WindowHandling FILES ${WINDOWHANDLING_SRCS})
 
 set (UI_SRCS
-			src/UI/UICtrlBase.cpp
-			src/UI/UICtrlBase.hpp
-            src/UI/TabBar/TabBar.cpp
-            src/UI/TabBar/TabBar.hpp
-            src/UI/ScrollBar/ScrollBar.cpp
-            src/UI/ScrollBar/ScrollBar.hpp
-            src/UI/CodeView/CodeView.cpp
-            src/UI/CodeView/CodeView.hpp)
+			    src/UI/UICtrlBase.cpp
+			    src/UI/UICtrlBase.hpp
+          src/UI/TabBar/TabBar.cpp
+          src/UI/TabBar/TabBar.hpp
+          src/UI/ScrollBar/ScrollBar.cpp
+          src/UI/ScrollBar/ScrollBar.hpp
+          src/UI/CodeView/CodeView.cpp
+          src/UI/CodeView/CodeView.hpp)
 list (APPEND SRCS ${UI_SRCS})
 source_group (UI FILES ${UI_SRCS})
 
@@ -135,6 +135,11 @@ set (DOCUMENT_SRCS
             src/Document/Document.hpp)
 list (APPEND SRCS ${DOCUMENT_SRCS})
 source_group (Document FILES ${DOCUMENT_SRCS})
+
+# Configure test data directory path
+set (TESTDATA_SIMPLEFILE "${CMAKE_SOURCE_DIR}/TestData/SimpleFile.cpp")
+configure_file (${CMAKE_SOURCE_DIR}/TestData/config_template.hpp ${CMAKE_BINARY_DIR}/Configuration/config.hpp)
+list (APPEND INCLUDES ${CMAKE_BINARY_DIR}/Configuration)
 
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})

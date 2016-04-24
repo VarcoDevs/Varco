@@ -32,7 +32,7 @@ namespace varco {
 
     virtual ~UIElement() = default;
 
-    virtual void repaint() {} // Might be requested by child controls (schedule or performs a repaint)
+    virtual void repaint() = 0; // Might be requested by child controls (schedule or performs a repaint)
     virtual void startMouseCapture() {} // Might be requested by child controls
   };
 

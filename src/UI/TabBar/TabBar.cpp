@@ -407,7 +407,7 @@ namespace varco {
 
     tabs[selectedTabIndex].trackingOffset = x - m_startXTrackingPosition;
     tabs[selectedTabIndex].dirty = true;
-    this->m_dirty = true;
+    m_dirty = true;
     m_parentContainer.repaint();
   }
 

@@ -6,8 +6,8 @@ namespace varco {
 
 #define VSCROLLBAR_WIDTH 20
 
-  CodeView::CodeView(UIElement<ui_container_tag>& parentWindow)
-    : UIElement(parentWindow)
+  CodeView::CodeView(UIElement<ui_container_tag>& parentContainer)
+    : UIElement(parentContainer)
   {
     // Create the vertical scrollbar
     m_verticalScrollBar = std::make_unique<ScrollBar>(*this);
@@ -44,7 +44,7 @@ namespace varco {
   }
 
   void CodeView::loadDocument(Document& doc) {
-    m_document = &doc;
+    m_document = &doc; // Save this document's address as the current one
 
     // Calculate the new document size
     m_document->recalculateDocumentLines();
@@ -173,6 +173,11 @@ namespace varco {
 
     canvas.flush();
 
+  }
+
+  void CodeView::repaint() {
+    // Signals the container to repaint
+    m_parentContainer.repaint();
   }
 
 }

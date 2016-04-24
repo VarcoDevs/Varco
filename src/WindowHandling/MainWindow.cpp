@@ -2,6 +2,7 @@
 #include <SkCanvas.h>
 #include <Utils/Utils.hpp>
 
+#include <config.hpp>
 
 namespace varco {
 
@@ -19,12 +20,17 @@ namespace varco {
     int id = m_tabCtrl.addNewTab("SimpleFile.cpp");
     auto it = m_tabDocumentMap.emplace(id, Document(m_codeEditCtrl));
     std::pair<const int, Document>& element = *(it.first);
-    element.second.loadFromFile("../TestData/SimpleFile.cpp");
+    element.second.loadFromFile(TestData::SimpleFile);
     //it.first->second->applySyntaxHighlight(CPP);
     m_codeEditCtrl.loadDocument(element.second);
     
     //tabCtrl.addNewTab("Second tab");
     //tabCtrl.addNewTab("Third tab");
+  }
+
+  void MainWindow::repaint() {
+    // Call the OS-specific repaint routine
+    BaseOSWindow::repaint();
   }
 
   // Main window drawing entry point

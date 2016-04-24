@@ -48,15 +48,15 @@ namespace varco {
     static_assert(
       prototype_traits<Map>::arity == 1 &&
       std::is_same<
-        std::remove_reference<prototype_traits<Map>::return_type>::type,
+        typename std::remove_reference<typename prototype_traits<Map>::return_type>::type,
         Accumulator
       >::value &&
         (std::is_same<
-          std::remove_cv<std::remove_reference<prototype_traits<Map>::param_type<0>::type>::type>::type,
-          Sequence::value_type
+          typename std::remove_cv<typename std::remove_reference<typename prototype_traits<Map>::template param_type<0>::type>::type>::type,
+          typename Sequence::value_type
         >::value || std::is_same<
-          std::remove_reference<prototype_traits<Map>::param_type<0>::type>::type,
-          Sequence::value_type
+          typename std::remove_reference<typename prototype_traits<Map>::template param_type<0>::type>::type,
+          typename Sequence::value_type
         >::value),
       "Map intermediate / input type doesn't match the expected accumulator / input value"
       );
@@ -64,14 +64,14 @@ namespace varco {
     static_assert(
       prototype_traits<Reduce>::arity == 2 &&
       std::is_same<
-        std::remove_reference<prototype_traits<Reduce>::param_type<0>::type>::type,
+        typename std::remove_reference<typename prototype_traits<Reduce>::template param_type<0>::type>::type,
         Accumulator
       >::value &&
         (std::is_same<
-          std::remove_cv<std::remove_reference<prototype_traits<Reduce>::param_type<1>::type>::type>::type,
+          typename std::remove_cv<typename std::remove_reference<typename prototype_traits<Reduce>::template param_type<1>::type>::type>::type,
           Accumulator
         >::value || std::is_same<
-          std::remove_reference<prototype_traits<Reduce>::param_type<1>::type>::type,
+          typename std::remove_reference<typename prototype_traits<Reduce>::template param_type<1>::type>::type,
           Accumulator
         >::value),
       "Reduce parameters don't match / incompatible with accumulator type"
@@ -80,7 +80,7 @@ namespace varco {
     using SequenceIterator = typename Sequence::const_iterator;
     static_assert(
       std::is_same<
-        std::iterator_traits<SequenceIterator>::iterator_category,
+        typename std::iterator_traits<SequenceIterator>::iterator_category,
         std::random_access_iterator_tag
       >::value,
       "Sequence hasn't random access iterators"
@@ -88,7 +88,7 @@ namespace varco {
     using AccumulatorIterator = typename Sequence::const_iterator;
     static_assert(
       std::is_same<
-        std::iterator_traits<AccumulatorIterator>::iterator_category,
+        typename std::iterator_traits<AccumulatorIterator>::iterator_category,
         std::random_access_iterator_tag
       >::value,
       "Accumulator hasn't random access iterators"
@@ -122,7 +122,7 @@ namespace varco {
 
     auto threadDispatcher = [&](size_t threadId, size_t start, size_t end) 
     {
-      prototype_traits<Map>::return_type thread_partials;
+      typename prototype_traits<Map>::return_type thread_partials;
       for (size_t i = start; i < end; ++i) {
         auto intermediate = map(sequence[i]);
         reduce(thread_partials, intermediate);

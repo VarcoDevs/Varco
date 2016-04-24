@@ -139,7 +139,7 @@ namespace varco {
 
     for (unsigned i = 0; i < NELEMS(atom_names); i++) {
             __lwi_atoms[i] = XInternAtom(fDisplay, atom_names[i], False);
-            printf("%s is now [%d]\n", atom_names[i], __lwi_atoms[i]);
+            printf("%s is now [%d]\n", atom_names[i], (int)__lwi_atoms[i]);
       }
 
 
@@ -213,7 +213,7 @@ namespace varco {
         int len;
         ret = XGetWMProtocols(fDisplay, fWin, &list, &len);
         for(int i=0; i < len; ++i)
-          printf("%d\n", list[i]);
+          printf("%d\n", (int)list[i]);
 
         pid_t pid = getpid();
         ret = XChangeProperty(
@@ -572,7 +572,7 @@ printf("I have redrawn the damn thing %d\n", lol++);
 
       case ClientMessage: {
 
-          printf("Received %d\n", evt->xclient.data.l[0]);
+          printf("Received %d\n", (int)evt->xclient.data.l[0]);
 
           if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_PING)) {
               evt->xclient.window = fWin;
@@ -693,7 +693,7 @@ printf("I have redrawn the damn thing %d\n", lol++);
     // Do nothing, linux tracks mouse exit if LeaveWindowMask is used
   }
 
-  void BaseOSWindow::redraw() {
+  void BaseOSWindow::repaint() {
     invalidateWindow();
   }
 
