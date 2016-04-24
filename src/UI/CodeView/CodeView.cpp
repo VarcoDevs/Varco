@@ -9,51 +9,73 @@ namespace varco {
   CodeView::CodeView(UIElement<ui_container_tag>& parentContainer)
     : UIElement(parentContainer)
   {
-    // Create the vertical scrollbar
-    m_verticalScrollBar = std::make_unique<ScrollBar>(*this);
-
     // Create a monospace typeface
     m_typeface = SkTypeface::CreateFromName("Consolas", SkTypeface::kNormal); // Or closest match
 
     // Stores the width of a single character in pixels with the given font (cache this value for
-    // every document to use it)
-    auto lol = m_typeface->getBounds().width();
-
+    // every document to use it) and the height of a line in pixels, plus the paint used for each of them
     m_fontPaint.setTextSize(SkIntToScalar(13));
     m_fontPaint.setAntiAlias(true);
     m_fontPaint.setLCDRenderText(true);
     m_fontPaint.setTypeface(m_typeface);
-    SkScalar width = m_fontPaint.measureText("A", 1);
-    m_characterWidthPixels = static_cast<int>(width);      
-    m_characterHeightPixels = static_cast<int>(m_fontPaint.getFontSpacing());
+
+    // The following is a conservative approach including kerning, hinting and antialiasing (a bit too much)
+    //SkRect bounds;
+    //m_fontPaint.measureText("A", 1, &bounds);
+    //m_characterWidthPixels = static_cast<int>(bounds.width());
+    
+    SkScalar widths[1];
+    m_fontPaint.getTextWidths("A", 1, widths);
+    m_characterWidthPixels = widths[0];
+
+    m_characterHeightPixels = m_fontPaint.getFontSpacing();
+
+    // Create the vertical scrollbar
+    m_verticalScrollBar = std::make_unique<ScrollBar>(*this);
+    m_verticalScrollBar->setLineHeightPixels(m_characterHeightPixels);
   }
 
   void CodeView::resize(SkRect rect) {
     UIElement::resize(rect);
 
+    // Recalculate and resize scrollbar control
     SkRect scrollBarRect = SkRect::MakeLTRB((SkScalar)(m_rect.fRight - VSCROLLBAR_WIDTH),
-      0, (SkScalar)m_rect.fRight, m_rect.fBottom);
+                                            0, (SkScalar)m_rect.fRight, m_rect.fBottom);
     m_verticalScrollBar->resize(scrollBarRect);
 
-    m_codeViewInitialized = true;
+    m_codeViewInitialized = true; // From now on we have valid buffer and size
 
-    if (m_document != nullptr && static_cast<int>(rect.width()) != m_document->m_wrapWidth) {
-      m_document->setWrapWidth(static_cast<int>(rect.width()));
+    // Calculate new wrap width (allow space for the vertical scrollbar if present)
+    auto newWrapWidth = static_cast<int>(rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
+
+    // If we have a document and we need to recalculate the wrapwidth
+    if (m_document != nullptr && newWrapWidth != m_document->m_wrapWidth) {
+      
+      m_document->setWrapWidth(newWrapWidth);      
       m_document->recalculateDocumentLines();
+
+      // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
+      m_verticalScrollBar->documentSizeChanged(m_document->m_maximumCharactersLine, 
+                                               m_document->m_numberOfEditorLines);
     }
   }
 
   void CodeView::loadDocument(Document& doc) {
+
     m_document = &doc; // Save this document's address as the current one
 
+    if (isControlReady() == false)
+      return; // We can 
+
+    // Calculate new wrap width (allow space for the vertical scrollbar if present)
+    auto newWrapWidth = static_cast<int>(m_rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
+    m_document->setWrapWidth(newWrapWidth);
     // Calculate the new document size
     m_document->recalculateDocumentLines();
 
-    // Update the document rendering dimensions
-    auto lineHeight = m_typeface->getBounds().height();
-
     // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
-    m_verticalScrollBar->documentSizeChanged(m_document->m_maximumCharactersLine, m_document->m_numberOfEditorLines, lineHeight);
+    m_verticalScrollBar->documentSizeChanged(m_document->m_maximumCharactersLine, 
+                                             m_document->m_numberOfEditorLines);
 
     //// Set a new pixmap for rendering this document ~ caveat: this is NOT the viewport dimension
     //// since everything needs to be rendered, not just the viewport region
@@ -83,7 +105,7 @@ namespace varco {
     paint(); // Trigger a cache invalidation for the viewport (necessary)
   }
 
-  int CodeView::getCharacterWidthPixels() const {
+  SkScalar CodeView::getCharacterWidthPixels() const {
     return m_characterWidthPixels;
   }
 

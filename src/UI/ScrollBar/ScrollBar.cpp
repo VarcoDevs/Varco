@@ -1,23 +1,32 @@
 #include <UI/ScrollBar/ScrollBar.hpp>
 #include <Document/Document.hpp>
 #include <SkCanvas.h>
+#include <SkPaint.h>
 
 namespace varco {
 
   ScrollBar::ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView)
     : m_parentControlContainer(codeView), UIElement(codeView),
-      m_textLineHeight(1), // Height of every line, it depends on the font used (although it's always monospaced)
+      m_lineHeightPixels(1), // Height of every line, it depends on the font used (although it's always monospaced)
       m_internalLineCount(1) // How many lines are actually in the document
   {}
 
-  // Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active
-  void ScrollBar::documentSizeChanged(const int width_characters, const int height_lines, const SkScalar lineHeight) {
+  void ScrollBar::setLineHeightPixels(SkScalar height) {
+    m_lineHeightPixels = height;
+  }
 
-    m_textLineHeight = lineHeight;
+  // Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active
+  void ScrollBar::documentSizeChanged(const int width_in_characters, const int height_in_line) {
     
     auto codeViewHeight = m_parentControlContainer.getRect(absoluteRect).height();
     // Update the maximum number of visible lines in the text control, this might have changed
-    m_maxViewVisibleLines = static_cast<int>(codeViewHeight / m_textLineHeight);
+    m_maxViewVisibleLines = static_cast<int>(codeViewHeight / m_lineHeightPixels);
+
+    // Store the real number of lines in the document
+    m_internalLineCount = height_in_line;
+
+    // Also update the maximum allowed to let the last line to be scrolled till the beginning of the view
+    m_maximum = m_internalLineCount - 1;
   }
 
   // The fundamental equation to repaint the scrollbar is:
@@ -34,7 +43,7 @@ namespace varco {
     //////////////////////////////////////////////////////////////////////
     // Draw the background of the bar (alpha only)
     //////////////////////////////////////////////////////////////////////
-    canvas.clear(0x00000000); // ARGB
+    canvas.clear(0xFF000000); // ARGB
 
     
     // >> ---------------------------------------------------------------------
@@ -49,7 +58,32 @@ namespace varco {
     // or equal to the line we're scrolled at), the position of the slider is:
     //   slider_position = view_height * (line_where_the_view_is_scrolled / total_number_of_lines_in_the_document)
     // in this case we calculate a "relative" position by using value() and maximum() which are relative to the control (not to the document)
-//    float viewRelativePos = float(m_maxViewVisibleLines) * (float(value()) / float(maximum() + (extraBottomLines)));
+    float viewRelativePos = float(m_maxViewVisibleLines) * (float(m_value) / float(m_maximum + extraBottomLines));
+
+    // now find the absolute position in the control's rect, the proportion is:
+    //  rect().height() : x = m_maxViewVisibleLines : viewRelativePos
+    float rectAbsPos = (float(m_rect.height()) * viewRelativePos) / float(m_maxViewVisibleLines);
+
+    // Calculate the length of the slider's rect including extraBottomLines
+    m_lenSlider = int(m_rect.height() * (float(m_maxViewVisibleLines) / float(m_internalLineCount + extraBottomLines)));
+
+    // Set a mimumim length for the slider (when there are LOTS of lines)
+    if (m_lenSlider < 15)
+      m_lenSlider = 15;
+
+    // Prevents the slider to be drawn, due to roundoff errors, outside the scrollbar rectangle
+    if (rectAbsPos + m_lenSlider > m_rect.height())
+      rectAbsPos -= (rectAbsPos + m_lenSlider) - m_rect.height();
+
+    // This is finally the drawing area for the slider
+    SkRect rcSlider = SkRect::MakeLTRB(0.f, rectAbsPos, m_rect.width() - 1.f, (SkScalar)m_lenSlider);
+
+    SkPaint simpleRed;
+    simpleRed.setColor(SK_ColorRED);
+    canvas.drawRect(rcSlider, simpleRed);
+    // p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
+
+    canvas.flush();
   }
 
 }

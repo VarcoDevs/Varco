@@ -55,7 +55,7 @@ namespace varco {
 
     // Variables related to how the control renders lines
     int m_characterWidthPixels;
-    int m_wrapWidth;
+    int m_wrapWidth = -1;
     int m_numberOfEditorLines;
     int m_maximumCharactersLine; // According to wrapWidth
   };

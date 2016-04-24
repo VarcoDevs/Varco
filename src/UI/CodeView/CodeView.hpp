@@ -20,7 +20,7 @@ namespace varco {
     void repaint() override;
 
     void loadDocument(Document& doc);
-    int getCharacterWidthPixels() const;
+    SkScalar getCharacterWidthPixels() const;
     bool isControlReady() const;
 
   private:
@@ -31,7 +31,7 @@ namespace varco {
     SkTypeface *m_typeface = nullptr; // Font used throughout the control
     SkPaint m_fontPaint; // Paint data for the font
 
-    int m_characterWidthPixels, m_characterHeightPixels;
+    SkScalar m_characterWidthPixels, m_characterHeightPixels;
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
                                                              // documents as soon as the first resize happens
   };

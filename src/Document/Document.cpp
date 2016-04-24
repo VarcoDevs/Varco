@@ -48,7 +48,7 @@ namespace varco {
 
   void Document::setWrapWidth(int width) {
     m_wrapWidth = width;
-  }
+  }  
 
   void Document::recalculateDocumentLines() {
 
@@ -69,7 +69,7 @@ namespace varco {
       std::vector<EditorLine> edLines;
       edLines.reserve(10); // Should be enough for every splitting
       if (m_wrapWidth != -1 && // Also check if the monospace'd width isn't exceeding the viewport
-        line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidth) {
+          line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidth) {
         // We have a wrap and the line is too big - WRAP IT
 
         edLines.clear();
@@ -137,7 +137,5 @@ namespace varco {
 
     m_physicalLines = blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 50U);
   }
-
-  // TODO multithread calculations
 
 }

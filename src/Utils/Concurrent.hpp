@@ -139,7 +139,11 @@ namespace varco {
     std::vector<std::thread> threads;
     for (size_t i = 0; i < numThreads; ++i) {
       size_t start = i * mapsPerThread;
-      size_t end = std::min(sequence.size(), start + mapsPerThread);
+      size_t end;
+      if (numThreads == 1)
+        end = sequence.size();
+      else
+        end = std::min(sequence.size(), start + mapsPerThread);
       threads_promises.emplace_back();
       threads_futures.emplace_back(threads_promises.back().get_future());
       threads.emplace_back(threadDispatcher, i, start, end);
