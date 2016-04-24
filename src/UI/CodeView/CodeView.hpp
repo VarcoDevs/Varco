@@ -4,15 +4,16 @@
 #include <UI/UICtrlBase.hpp>
 #include <UI/ScrollBar/ScrollBar.hpp>
 #include <Document/Document.hpp>
+#include <SkPaint.h>
 #include <memory>
 
 class SkTypeface;
 
 namespace varco {
 
-  class CodeView : public UICtrlBase, public UIContainer { // The main code edit control
+  class CodeView : public UIElement<ui_control_tag, ui_container_tag> { // The main code edit control
   public:
-    CodeView(UIContainer& parentWindow);
+    CodeView(UIElement<ui_container_tag>& parentWindow);
 
     void resize(SkRect rect) override;
     void paint() override;
@@ -25,7 +26,10 @@ namespace varco {
 
     Document *m_document = nullptr;
     std::unique_ptr<ScrollBar> m_verticalScrollBar;
+
     SkTypeface *m_typeface = nullptr; // Font used throughout the control
+    SkPaint m_fontPaint; // Paint data for the font
+
     int m_characterWidthPixels, m_characterHeightPixels;
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
                                       // documents as soon as the first resize happens

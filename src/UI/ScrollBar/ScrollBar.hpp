@@ -7,9 +7,9 @@ namespace varco {
 
   class CodeView;
 
-  class ScrollBar : public UICtrlBase {
+  class ScrollBar : public UIElement<ui_control_tag> {
   public:
-    ScrollBar(UIContainer& codeView);
+    ScrollBar(UIElement<ui_container_tag>& codeView);
 
     void paint() override;
 

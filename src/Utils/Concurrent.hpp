@@ -131,7 +131,7 @@ namespace varco {
       // ~-~-~-~-~-~-~-~-~ Sync barrier ~-~-~-~-~-~-~-~-~
       {
         std::unique_lock<std::mutex> lock(barrier_mutex);
-        threads_partials_map.emplace(threadId, thread_partials);
+        threads_partials_map.emplace(threadId, std::move(thread_partials));
         threads_promises[threadId].set_value();
       }      
     };

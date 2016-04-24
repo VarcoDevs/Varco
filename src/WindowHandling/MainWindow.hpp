@@ -14,7 +14,7 @@
 
 namespace varco {
 
-  class MainWindow : public BaseOSWindow, public UIContainer {
+  class MainWindow : public BaseOSWindow, public UIElement<ui_container_tag> {
   public:
 
 #ifdef _WIN32

@@ -2,7 +2,7 @@
 #include <SkRect.h>
 
 namespace varco {
-
+  /*
   UICtrlBase::UICtrlBase(UIContainer& parentContainer) :
     m_parentContainer(parentContainer)
   {}
@@ -34,5 +34,5 @@ namespace varco {
     }
     return m_rect;
   }
-
+  */
 }

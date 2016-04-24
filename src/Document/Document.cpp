@@ -37,7 +37,7 @@ namespace varco {
 
       // For simplicity convert all tabs into 4 spaces and just deal with those
       std::regex tabs("\t");
-      line = std::regex_replace(line, invalidEndings, "    ");
+      line = std::regex_replace(line, tabs, "    ");
 
       m_plainTextLines.push_back(std::move(line));
     }
@@ -136,11 +136,6 @@ namespace varco {
     };
 
     m_physicalLines = blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 50U);
-
-   // m_physicalLines =
-   //   blockingMappedReduced<std::vector<PhysicalLine>>(m_plainTextLines.begin(), m_plainTextLines.end(),
-   //     mapFn, reduceFn, QtConcurrent::SequentialReduce);
-
   }
 
   // TODO multithread calculations

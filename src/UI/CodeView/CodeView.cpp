@@ -6,8 +6,8 @@ namespace varco {
 
 #define VSCROLLBAR_WIDTH 20
 
-  CodeView::CodeView(UIContainer& parentWindow)
-    : UICtrlBase(parentWindow)
+  CodeView::CodeView(UIElement<ui_container_tag>& parentWindow)
+    : UIElement(parentWindow)
   {
     // Create the vertical scrollbar
     m_verticalScrollBar = std::make_unique<ScrollBar>(*this);
@@ -19,20 +19,17 @@ namespace varco {
     // every document to use it)
     auto lol = m_typeface->getBounds().width();
 
-    {
-      SkPaint paintTemp;
-      paintTemp.setTextSize(SkIntToScalar(13));
-      paintTemp.setAntiAlias(true);
-      paintTemp.setLCDRenderText(true);
-      paintTemp.setTypeface(m_typeface);
-      SkScalar width = paintTemp.measureText("A", 1);
-      m_characterWidthPixels = static_cast<int>(width);      
-      m_characterHeightPixels = static_cast<int>(paintTemp.getFontSpacing());
-    }
+    m_fontPaint.setTextSize(SkIntToScalar(13));
+    m_fontPaint.setAntiAlias(true);
+    m_fontPaint.setLCDRenderText(true);
+    m_fontPaint.setTypeface(m_typeface);
+    SkScalar width = m_fontPaint.measureText("A", 1);
+    m_characterWidthPixels = static_cast<int>(width);      
+    m_characterHeightPixels = static_cast<int>(m_fontPaint.getFontSpacing());
   }
 
   void CodeView::resize(SkRect rect) {
-    UICtrlBase::resize(rect);
+    UIElement::resize(rect);
 
     SkRect scrollBarRect = SkRect::MakeLTRB((SkScalar)(m_rect.fRight - VSCROLLBAR_WIDTH),
       0, (SkScalar)m_rect.fRight, m_rect.fBottom);
@@ -135,13 +132,7 @@ namespace varco {
     size_t documentRelativePos = 0;
     size_t lineRelativePos = 0;
 
-    SkPaint textPaint;
-    textPaint.setColor(SK_ColorWHITE);
-    textPaint.setAlpha(255);
-    textPaint.setTextSize(SkIntToScalar(11));
-    textPaint.setAntiAlias(true);
-    textPaint.setLCDRenderText(true);
-    textPaint.setTypeface(m_typeface);
+    m_fontPaint.setColor(SK_ColorWHITE);
 
     // Implement the main rendering loop algorithm which renders characters segment by segment
     // on the viewport area
@@ -161,7 +152,7 @@ namespace varco {
             if (el.m_characters.size() > 0) { // Empty lines must be skipped
               std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
 
-              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, textPaint);
+              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, m_fontPaint);
               //painter.drawText(tpoint, ts);
               charsRendered = (int)ts.size();
             }

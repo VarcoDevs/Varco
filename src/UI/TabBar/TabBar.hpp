@@ -45,7 +45,7 @@ namespace varco {
     bool selected = false; // Is this a selected tab?
   };
 
-  class TabBar : public UICtrlBase { // The main tab control
+  class TabBar : public UIElement<ui_control_tag> { // The main tab control
     friend class Tab;
     // Initialization values for all the tabs in this control
     const SkScalar TAB_MAX_WIDTH = 150.0;
@@ -53,7 +53,7 @@ namespace varco {
     const SkScalar tabOverlapSize = 20.0f; // The amount of overlap between two adjacent tabs
     SkRect tabsCurrentRect = SkRect::MakeLTRB(0, 0, TAB_MAX_WIDTH, 33.0); // The rect that encloses the tab (coords relative to the tab control)
   public:
-    TabBar(UIContainer& parentWindow);
+    TabBar(UIElement<ui_container_tag>& parentWindow);
     
     void resize(SkRect rect) override; // Set the new rect where the control will redraw itself    
     void paint() override; // Paint the control in the bitmap

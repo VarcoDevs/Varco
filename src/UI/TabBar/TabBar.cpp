@@ -162,8 +162,8 @@ namespace varco {
     this->dirty = true;
   }
 
-  TabBar::TabBar(UIContainer& parentWindow) :
-    UICtrlBase(parentWindow)
+  TabBar::TabBar(UIElement<ui_container_tag>& parentWindow) :
+    UIElement(parentWindow)
   {
     // DEBUG - add some tabs
     //tabs.emplace_back(this, "ALOTOFTEXTALOTOFTEXT");
@@ -172,7 +172,7 @@ namespace varco {
   }
   
   void TabBar::resize(SkRect rect) {
-    UICtrlBase::resize(rect); // Call base class first
+    UIElement::resize(rect); // Call base class first
 
     if (this->m_dirty)
       recalculateTabsRects();
@@ -323,7 +323,7 @@ namespace varco {
     canvas.restore();
 
     if (m_dirty == true)
-      m_parentContainer.redraw(); // Schedule a redraw
+      m_parentContainer.repaint(); // Schedule a repaint
   }
 
   void TabBar::swapTabs(int tab1, int tab2) {
@@ -397,7 +397,7 @@ namespace varco {
 
     if (redrawNeeded) {
       this->m_dirty = true;
-      m_parentContainer.redraw();
+      m_parentContainer.repaint();
     }
   }
 
@@ -408,7 +408,7 @@ namespace varco {
     tabs[selectedTabIndex].trackingOffset = x - m_startXTrackingPosition;
     tabs[selectedTabIndex].dirty = true;
     this->m_dirty = true;
-    m_parentContainer.redraw();
+    m_parentContainer.repaint();
   }
 
   void TabBar::onLeftMouseUp(SkScalar x, SkScalar y) {
@@ -443,7 +443,7 @@ namespace varco {
       selectedTabIndex = static_cast<int>(tabs.size() - 1);
     }
 
-    this->m_parentContainer.redraw();
+    this->m_parentContainer.repaint();
 
     return newTabId;
   }
@@ -464,7 +464,7 @@ namespace varco {
 
     tabs[selectedTabIndex].dirty = true;
     m_dirty = true;
-    m_parentContainer.redraw();
+    m_parentContainer.repaint();
   }
 
 }
