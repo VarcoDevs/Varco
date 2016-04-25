@@ -259,7 +259,7 @@ namespace varco {
 
     // This might help make the context non-vsynced
     if (extensions.hasExtension(dc, "WGL_EXT_swap_control"))
-      extensions.swapInterval(-1);
+      extensions.swapInterval(1);
 
     return glrc;
   }

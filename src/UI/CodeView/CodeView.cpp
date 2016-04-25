@@ -192,7 +192,6 @@ namespace varco {
       }
     }
 
-
     canvas.flush();
 
   }

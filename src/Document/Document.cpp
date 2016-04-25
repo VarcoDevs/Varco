@@ -135,7 +135,7 @@ namespace varco {
 
     };
 
-    m_physicalLines = blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 50U);
+    m_physicalLines = blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 30U);
   }
 
 }

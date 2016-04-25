@@ -161,6 +161,7 @@ namespace varco {
 
   int BaseOSWindow::show() {
     ShowWindow(hWnd, CmdShow);
+    // SetForegroundWindow(hWnd); // This also assigns a slightly higher priority to the main thread
     UpdateWindow(hWnd);
 
     std::function<void(void)> renderProc = std::bind(&BaseOSWindow::renderThreadFn, this);
@@ -240,6 +241,25 @@ namespace varco {
         this->onLeftMouseUp(x, y);
       } break;
 
+      /*case WM_SIZING: {
+        RECT *rect = (RECT*)lParam;
+        auto width = rect->right - rect->left;
+        auto height = rect->bottom - rect->top;
+        this->resize(width, height);
+
+        std::unique_lock<std::mutex> lk(renderMutex);
+        redrawNeeded = true;
+        renderCV.notify_one();
+      } break;*/
+
+      case WM_SIZING: {
+        // RECT *rect = (RECT*)lParam;
+
+        // Hack: this will lock handling sizing events until the rendering thread has finished
+        // processing one rendering step forcing resizing and rendering to proceed in lock-steps
+        std::unique_lock<std::mutex> lk(renderMutex);        
+      } break;
+
       case WM_SIZE: {
         auto width = LOWORD(lParam);
         auto height = HIWORD(lParam);
@@ -248,6 +268,8 @@ namespace varco {
         std::unique_lock<std::mutex> lk(renderMutex);
         redrawNeeded = true;
         renderCV.notify_one();
+
+        return 0;
       } break;
 
       case WM_PAINT: {
@@ -346,10 +368,10 @@ namespace varco {
       //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
       // } else {
 
-
-
       fContext->flush();
-      wglSwapLayerBuffers(dc, WGL_SWAP_MAIN_PLANE);
+      if (!wglSwapLayerBuffers(dc, WGL_SWAP_MAIN_PLANE))
+        SwapBuffers(dc);
+      //SwapBuffers(dc);
       //glXSwapBuffers(fDisplay, fWin);
 
       if (Width == threadWidth && Height == threadHeight) {// Check for size to be updated
@@ -413,7 +435,7 @@ namespace varco {
 
   void BaseOSWindow::resize(int width, int height) {
     this->Width = width;
-    this->Height = height;    
+    this->Height = height;
   }  
 
 } // namespace varco
