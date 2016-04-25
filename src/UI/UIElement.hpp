@@ -43,7 +43,7 @@ namespace varco {
 
     using tag_control = ui_container_tag;
 
-    virtual void resize(SkRect rect) {
+    virtual void resize(SkRect rect /* relative to parent */) {
       if (m_rect != rect && rect.fTop < rect.fBottom && rect.fLeft < rect.fRight) {
         m_rect = rect;
 

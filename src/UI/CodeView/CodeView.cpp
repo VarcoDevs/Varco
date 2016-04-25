@@ -1,10 +1,11 @@
 #include <UI/CodeView/CodeView.hpp>
+#include <Utils/Utils.hpp>
 #include <SkCanvas.h>
 #include <SkTypeface.h>
 
 namespace varco {
 
-#define VSCROLLBAR_WIDTH 20
+#define VSCROLLBAR_WIDTH 15
 
   CodeView::CodeView(UIElement<ui_container_tag>& parentContainer)
     : UIElement(parentContainer)
@@ -39,8 +40,8 @@ namespace varco {
     UIElement::resize(rect);
 
     // Recalculate and resize scrollbar control
-    SkRect scrollBarRect = SkRect::MakeLTRB((SkScalar)(m_rect.fRight - VSCROLLBAR_WIDTH),
-                                            0, (SkScalar)m_rect.fRight, m_rect.fBottom);
+    SkRect scrollBarRect = SkRect::MakeLTRB(m_rect.fRight - (SkScalar)VSCROLLBAR_WIDTH,
+                                            0.f, m_rect.fRight, m_rect.fBottom);
     m_verticalScrollBar->resize(scrollBarRect);
 
     m_codeViewInitialized = true; // From now on we have valid buffer and size
@@ -113,6 +114,28 @@ namespace varco {
     return m_codeViewInitialized;
   }
 
+  void CodeView::onLeftMouseDown(SkScalar x, SkScalar y) {
+    
+    SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);
+
+    if (m_verticalScrollBar && isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(), m_verticalScrollBar->getRect(relativeToParentRect)))
+      m_verticalScrollBar->onLeftMouseDown(relativeToParentCtrl.x(), relativeToParentCtrl.y());
+  }
+
+  void CodeView::onLeftMouseMove(SkScalar x, SkScalar y) {
+    SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);
+
+    if (m_verticalScrollBar && isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(), m_verticalScrollBar->getRect(relativeToParentRect)))
+      m_verticalScrollBar->onLeftMouseMove(relativeToParentCtrl.x(), relativeToParentCtrl.y());
+  }
+
+  void CodeView::onLeftMouseUp(SkScalar x, SkScalar y) {
+    SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);
+
+    if (m_verticalScrollBar && isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(), m_verticalScrollBar->getRect(relativeToParentRect)))
+      m_verticalScrollBar->onLeftMouseUp(relativeToParentCtrl.x(), relativeToParentCtrl.y());
+  }
+
   void CodeView::paint() {
 
     if (!m_dirty)
@@ -139,8 +162,8 @@ namespace varco {
     //////////////////////////////////////////////////////////////////////
     {
       m_verticalScrollBar->paint();
-      canvas.drawBitmap(m_verticalScrollBar->getBitmap(), m_verticalScrollBar->getRect().fLeft, 
-                        m_verticalScrollBar->getRect().fTop);
+      canvas.drawBitmap(m_verticalScrollBar->getBitmap(), m_verticalScrollBar->getRect(relativeToParentRect).fLeft,
+                        m_verticalScrollBar->getRect(relativeToParentRect).fTop);
     }
 
     if (m_document == nullptr)

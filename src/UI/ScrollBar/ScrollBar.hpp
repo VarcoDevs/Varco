@@ -2,8 +2,22 @@
 #define VARCO_SCROLLBAR_HPP
 
 #include <UI/UIElement.hpp>
+#include <SkPath.h>
 
 namespace varco {
+
+  class ScrollBar;
+
+  class Slider {
+  private:
+    friend class ScrollBar;
+    Slider(ScrollBar& parent);
+
+    ScrollBar& m_parent;
+    SkPath   m_path; // The path where clicks and inputs are accepted
+    SkScalar m_lenSlider;
+    SkRect   m_sliderRect;
+  };
 
   class CodeView;
 
@@ -13,11 +27,16 @@ namespace varco {
 
     void paint() override;
 
+    void onLeftMouseDown(SkScalar x, SkScalar y);
+    void onLeftMouseMove(SkScalar x, SkScalar y);
+    void onLeftMouseUp(SkScalar x, SkScalar y);
+
     void setLineHeightPixels(SkScalar height);
     void documentSizeChanged(const int width_in_characters, const int height_in_lines);
 
   private:
     UIElement<ui_container_tag, ui_control_tag>& m_parentControlContainer;
+    Slider m_slider;
 
     int  m_maxViewVisibleLines; // Lines that the current view of the text control can visualize
     int  m_internalLineCount;   // Real lines of the document (not multiplied by m_textLineHeight)
@@ -25,9 +44,7 @@ namespace varco {
     int  m_maximum; // Last document line index we're allowed to scroll to
     int  m_value = 0;   // Current document line index we're at
 
-    SkScalar  m_lineHeightPixels;
-
-    int m_lenSlider;
+    SkScalar  m_lineHeightPixels;    
   };
 
 }

@@ -419,7 +419,7 @@ namespace varco {
     if (makeSelected && selectedTabIndex != -1) // Deselect old selected tab
       tabs[selectedTabIndex].setSelected(false);
 
-    tabs.emplace_back(this, title);
+    tabs.emplace_back(this, title, Tab::private_access{});
 
     // Assign a free id to the tab (this is not the tab index in the control)
     auto getFreeIdFromPool = [&](int tabIndex) {

@@ -23,6 +23,11 @@ namespace varco {
     SkScalar getCharacterWidthPixels() const;
     bool isControlReady() const;
 
+    // These might also forward the event to a scrollbar if present
+    void onLeftMouseDown(SkScalar x, SkScalar y);
+    void onLeftMouseMove(SkScalar x, SkScalar y);
+    void onLeftMouseUp(SkScalar x, SkScalar y);
+
   private:
 
     Document *m_document = nullptr;

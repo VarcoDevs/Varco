@@ -15,8 +15,40 @@ namespace varco {
   class TabBar;  
 
   class Tab { // Represents a tab inside the tab control
-    friend class TabBar;
+  private:
+
+    // Why are we using delegate constructors and declaring a private_access inner structure?
+    //
+    // We want to have Tab's private constructor accessible only to TabBar but we also want
+    // to be able to construct objects in-place from TabBar with
+    //   tabs_vector.emplace_back("I'm a new tab");
+    // The problem with the approach above is: emplace_back delegates construction of the
+    // Tab object to std::allocator (construct()) and this is not a friend of Tab.
+    //
+    // To workaround this issue we can either supply a custom TabAllocator which, being an inner class,
+    // as of [class.access.nest]/p1
+    //
+    //   "A nested class is a member and as such has the same access rights as any other member."
+    //
+    // would allow TabsBar to emplace_back Tabs by using the custom member allocator provided.
+    //
+    // Unfortunately this doesn't work on MSVC and thus we need a plan B: a public constructor
+    //  Tab(TabBar *parent, std::string title, const private_access&);
+    // that, since requires a private_access structure (privately declared), can only be called by
+    // a friend class. Since the constructor (called by the allocator) then delegates the actual object
+    // construction to another constructor (C++11 and above only), this will ensure there will be no
+    // access problems.
+
+    struct private_access {};
+
   public:
+    Tab(TabBar *parent, std::string title, const private_access&) : // Only accessible to friend classes
+      Tab(parent, title)
+    {}
+  private:
+
+    friend class TabBar;
+  
     Tab(TabBar *parent, std::string title);
 
     // Paint the tab into its own bitmap
@@ -30,7 +62,6 @@ namespace varco {
     SkScalar getMovementOffset();
     SkScalar getTrackingOffset();
 
-  private:
     TabBar *parent;
     std::string title;
     int uniqueId;

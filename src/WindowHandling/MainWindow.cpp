@@ -60,6 +60,8 @@ namespace varco {
     // Forward the event to a container control
     if (isPointInsideRect(x, y, m_tabCtrl.getRect()))
       m_tabCtrl.onLeftMouseDown(x, y);
+    else if (isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
+      m_codeEditCtrl.onLeftMouseDown(x, y);
 
     // [] Other controls' tests should go here
   }
@@ -71,6 +73,8 @@ namespace varco {
       m_tabCtrl.onLeftMouseMove(x, y);
     else if (m_tabCtrl.isTrackingActive() == true)
       m_tabCtrl.stopTracking();
+    else if (isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
+      m_codeEditCtrl.onLeftMouseMove(x, y);
 
     // [] Other controls' tests should go here
   }
@@ -84,7 +88,9 @@ namespace varco {
 
     // Forward the event to a container control
     if (isPointInsideRect(x, y, m_tabCtrl.getRect()))
-      m_tabCtrl.onLeftMouseUp(x, y);    
+      m_tabCtrl.onLeftMouseUp(x, y);
+    else if (isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
+      m_codeEditCtrl.onLeftMouseUp(x, y);
 
     // [] Other controls' tests should go here
   }
