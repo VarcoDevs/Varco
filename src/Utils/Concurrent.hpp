@@ -144,9 +144,12 @@ namespace varco {
         end = sequence.size();
       else
         end = std::min(sequence.size(), start + mapsPerThread);
-      threads_promises.emplace_back();
-      threads_futures.emplace_back(threads_promises.back().get_future());
-      threads.emplace_back(threadDispatcher, i, start, end);
+      {
+        std::unique_lock<std::mutex> lock(barrier_mutex);
+        threads_promises.emplace_back();
+        threads_futures.emplace_back(threads_promises.back().get_future());
+        threads.emplace_back(threadDispatcher, i, start, end);
+      }
     }
 
     for (auto& future : threads_futures)

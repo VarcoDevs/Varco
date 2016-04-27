@@ -146,6 +146,7 @@ source_group (Lexers FILES ${LEXERS_SRCS})
 
 # Configure test data directory path
 set (TESTDATA_SIMPLEFILE "${CMAKE_SOURCE_DIR}/TestData/SimpleFile.cpp")
+set (TESTDATA_BASICBLOCKFILE "${CMAKE_SOURCE_DIR}/TestData/BasicBlock.cpp")
 configure_file (${CMAKE_SOURCE_DIR}/TestData/config_template.hpp ${CMAKE_BINARY_DIR}/Configuration/config.hpp)
 list (APPEND INCLUDES ${CMAKE_BINARY_DIR}/Configuration)
 
