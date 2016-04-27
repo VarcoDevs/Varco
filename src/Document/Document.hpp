@@ -2,6 +2,7 @@
 #define VARCO_DOCUMENT_HPP
 
 #include <UI/UIElement.hpp>
+#include <Lexers/Lexer.hpp>
 #include <vector>
 #include <string>
 
@@ -36,6 +37,8 @@ namespace varco {
     std::vector<EditorLine> m_editorLines;
   };
 
+  enum SyntaxHighlight { NONE, CPP };
+
   class CodeView;
 
   class Document : public UIElement<ui_control_tag> {
@@ -43,11 +46,12 @@ namespace varco {
     Document(CodeView& codeView);    
 
     bool loadFromFile(std::string file);
+    void applySyntaxHighlight(SyntaxHighlight s);
 
   private:
     friend class CodeView;
 
-    void setWrapWidth(int width);
+    void setWrapWidth(int width);    
     void recalculateDocumentLines();
 
     void paint() override; // Renders the entire document on its bitmap
@@ -61,7 +65,12 @@ namespace varco {
     SkScalar m_characterHeightPixels;
     int m_wrapWidth = -1;
     int m_numberOfEditorLines;
-    int m_maximumCharactersLine; // According to wrapWidth    
+    int m_maximumCharactersLine; // According to wrapWidth   
+
+    std::unique_ptr<LexerBase> m_lexer;
+    bool m_needReLexing = false;
+    bool m_firstDocumentRecalculate = true;
+    StyleDatabase m_styleDb;
   };
 
 }

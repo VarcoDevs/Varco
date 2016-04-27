@@ -51,18 +51,52 @@ namespace varco {
     if (m_wrapWidth != width)
       m_dirty = true;
     m_wrapWidth = width;
-  }  
+  }
+
+  void Document::applySyntaxHighlight(SyntaxHighlight s) {
+    m_needReLexing = false;
+    switch (s) {
+    case NONE: {
+      if (m_lexer) { // Check if there were a lexer before (i.e. the smart pointer was set)
+        m_lexer.release();
+        m_needReLexing = true; // Syntax has been changed, re-lex the document at the next recalculate
+      }
+    } break;
+    case CPP: {
+      if (!m_lexer || isLexer(m_lexer.get()).ofType(CPPLexerType) == false) {
+        m_lexer.reset(LexerBase::createLexerOfType(CPPLexerType));
+        m_needReLexing = true; // Syntax has been changed, re-lex the document at the next recalculate
+      }
+    } break;
+    }
+
+
+    // If the document was already recalculated, just recalculate and apply the new syntax highlight
+    if (m_firstDocumentRecalculate == false)
+      recalculateDocumentLines();
+  }
+
 
   void Document::recalculateDocumentLines() {
 
     if (!m_codeView.isControlReady())
       return; // A document can be loaded at any time
 
+    m_firstDocumentRecalculate = false;
+
+    if (m_needReLexing) {
+      std::string m_plainText;
+      for (auto& line : m_plainTextLines) { // Expensive, hopefully this doesn't happen too often - LEX DIRECTLY FROM VECTOR
+        m_plainText.append(line);
+        m_plainText += '\n';
+      }
+      m_lexer->lexInput(std::move(m_plainText), m_styleDb);
+      m_needReLexing = false;
+    }
+
     // Load parameters from codeview parent
     m_characterWidthPixels = m_codeView.getCharacterWidthPixels();
     m_characterHeightPixels = m_codeView.getCharacterHeightPixels();
-
-    // TODO lexing
 
     // Drop previous lines
     m_physicalLines.clear();
@@ -157,7 +191,7 @@ namespace varco {
     canvas.save();
 
     //////////////////////////////////////////////////////////////////////
-    // Draw the background of the control
+    // Draw the background of the document
     //////////////////////////////////////////////////////////////////////
     {
       SkPaint background;
@@ -165,18 +199,77 @@ namespace varco {
       canvas.drawRect(rect, background);
     }    
 
+    //////////////////////////////////////////////////////////////////////
+    // Draw the entire document with a classic monokai style
+    //////////////////////////////////////////////////////////////////////
+    SkPaint& painter = m_codeView.m_fontPaint;
+    painter.setColor(SK_ColorWHITE);
+
+    auto setColor = [&painter](Style s) {
+      switch (s) {
+        case Comment: {
+          painter.setColor(SkColorSetARGB(255, 117, 113, 94)); // Gray-ish 
+        } break;
+        case Keyword: {
+          painter.setColor(SkColorSetARGB(255, 249, 38, 114)); // Pink-ish
+        } break;
+        case QuotedString: {
+          painter.setColor(SkColorSetARGB(255, 230, 219, 88)); // Yellow-ish
+        } break;
+        case Identifier: {
+          painter.setColor(SkColorSetARGB(255, 166, 226, 46)); // Green-ish
+        } break;
+        case KeywordInnerScope:
+        case FunctionCall: {
+          painter.setColor(SkColorSetARGB(255, 102, 217, 239)); // Light blue
+        } break;
+        case Literal: {
+          painter.setColor(SkColorSetARGB(255, 174, 129, 255)); // Purple-ish
+        } break;
+        default: {
+          painter.setColor(SK_ColorWHITE);
+        } break;
+      };
+    };
+
     size_t documentRelativePos = 0;
     size_t lineRelativePos = 0;
-
-    m_codeView.m_fontPaint.setColor(SK_ColorWHITE);
 
     struct {
       float x;
       float y;
     } startpoint = { 5, 20 }; // Start point where to start rendering
 
-    // Implement the main rendering loop algorithm which renders characters segment by segment
-    // on the viewport area
+    auto styleIt = m_styleDb.styleSegment.begin();
+    auto styleEnd = m_styleDb.styleSegment.end();
+    size_t nextDestination = -1;
+
+    auto calculateNextDestination = [&]() {
+      // We can have 2 cases here:
+      // 1) Our position hasn't still reached a style segment (apply regular style and continue)
+      // 2) Our position is exactly on the start of a style segment (apply segment style and continue)
+      // If there are no other segments, use a regular style and continue till the end of the lines
+
+      if (styleIt == styleEnd) { // No other segments
+        nextDestination = -1;
+        setColor(Normal);
+        return;
+      }
+
+      if (styleIt->start > documentRelativePos) { // Case 1
+        setColor(Normal);
+        nextDestination = styleIt->start;
+      }
+      else if (styleIt->start == documentRelativePos) { // Case 2
+        setColor(styleIt->style);
+        nextDestination = styleIt->start + styleIt->count;
+        ++styleIt; // This makes sure our document relative position is never ahead of a style segment
+      }
+    };
+
+    // First time we don't have a destination set, just find one (if there's any)
+    calculateNextDestination();
+
     for (auto& pl : m_physicalLines) {
 
       size_t editorLineIndex = 0; // This helps tracking the last EditorLine of a PhysicalLine
@@ -186,28 +279,66 @@ namespace varco {
         do {
           startpoint.x = 5.f + lineRelativePos * m_characterWidthPixels;
 
+          // If we don't have a destination OR we can't reach it within our line, just draw the entire line and continue
+          if (nextDestination == -1 ||
+            nextDestination > documentRelativePos + (el.m_characters.size() - lineRelativePos)) {
 
-          // Multiple lines will have to be rendered, just render this till the end and continue
+            // Multiple lines will have to be rendered, just render this till the end and continue
 
-          int charsRendered = 0;
-          if (el.m_characters.size() > 0) { // Empty lines must be skipped
-            std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
+            size_t charsRendered = 0;
+            if (el.m_characters.size() > 0) { // Empty lines must be skipped
+              std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
+              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+              charsRendered = ts.size();
+            }
 
-            canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, m_codeView.m_fontPaint);
-            //painter.drawText(tpoint, ts);
-            charsRendered = (int)ts.size();
+            lineRelativePos = 0; // Next editor line will just start from the beginning
+            documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
+              (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
+
+            break; // Go and fetch a new line for the next cycle
           }
+          else {
 
-          lineRelativePos = 0; // Next editor line will just start from the beginning
-          documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
-            (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
+            // We can reach the goal within this line
 
-          break; // Go and fetch a new line for the next cycle
+            size_t charsRendered = 0;
+            if (el.m_characters.size() > 0) { // Empty lines must be skipped
+              std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(nextDestination - documentRelativePos));
+              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+              charsRendered = ts.size();
+            }
+
+            bool goFetchNewLine = false; // If this goal also exhausted the current editor line, go fetch
+                                         // another one
+            bool addNewLine = false; // If this was the last editor line, also add a newline because it
+                                     // corresponds to a new physical line starting
+            if (nextDestination - documentRelativePos + lineRelativePos == el.m_characters.size()) {
+              goFetchNewLine = true;
+
+              // Do not allow EditorLine to insert a '\n'. They're virtual lines
+              if (editorLineIndex == pl.m_editorLines.size())
+                addNewLine = true;
+
+              lineRelativePos = 0; // Next editor line will just start from the beginning
+            }
+            else
+              lineRelativePos += charsRendered;
+
+            documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's
+                                                                         // end AND a physical line ended, not an EditorLine
+
+            calculateNextDestination(); // Need a new goal
+
+            if (goFetchNewLine)
+              break; // Go fetch a new editor line (possibly on another physical line),
+                     // we exhausted this editor line
+          }
 
         } while (true);
 
         // Move the rendering cursor (carriage-return)
-        startpoint.y = startpoint.y + m_codeView.m_characterHeightPixels;
+        startpoint.y = startpoint.y + m_characterHeightPixels;
       }
     }
 

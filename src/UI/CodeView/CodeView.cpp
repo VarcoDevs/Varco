@@ -16,7 +16,7 @@ namespace varco {
 
     // Stores the width of a single character in pixels with the given font (cache this value for
     // every document to use it) and the height of a line in pixels, plus the paint used for each of them
-    m_fontPaint.setTextSize(SkIntToScalar(13));
+    m_fontPaint.setTextSize(SkIntToScalar(14));
     m_fontPaint.setAntiAlias(true);
     m_fontPaint.setLCDRenderText(true);
     m_fontPaint.setTypeface(m_typeface);
@@ -165,9 +165,9 @@ namespace varco {
       m_verticalScrollBar->onLeftMouseUp(relativeToParentCtrl.x(), relativeToParentCtrl.y());
   }
 
-  // Change the Y offset to the specified one from the beginning of a document (receives a percentage of the total document size)
-  void CodeView::setViewportYOffset(SkScalar percentage) {
-    m_currentYPercentage = percentage;
+  // Change the Y offset to the specified one from the beginning of a document (receives an offset in the total document size)
+  void CodeView::setViewportYOffset(SkScalar value) {
+    m_currentYoffset = value;
     m_dirty = true;
     m_parentContainer.repaint();
   }
@@ -218,7 +218,7 @@ namespace varco {
     if (m_verticalScrollBar)
       verticalScrollbarWidth = m_verticalScrollBar->getRect(absoluteRect).width();
 
-    auto documentYoffset = (m_currentYPercentage ) * m_document->m_characterHeightPixels;
+    auto documentYoffset = m_currentYoffset * m_document->m_characterHeightPixels;
 
     SkRect viewportRect = SkRect::MakeLTRB(getRect(absoluteRect).fLeft, getRect(absoluteRect).fTop,
                                            getRect(absoluteRect).fRight - verticalScrollbarWidth, getRect(absoluteRect).fBottom);

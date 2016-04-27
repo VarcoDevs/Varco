@@ -136,6 +136,14 @@ set (DOCUMENT_SRCS
 list (APPEND SRCS ${DOCUMENT_SRCS})
 source_group (Document FILES ${DOCUMENT_SRCS})
 
+set (LEXERS_SRCS
+            src/Lexers/Lexer.hpp
+            src/Lexers/Lexer.cpp
+            src/Lexers/CPPLexer.hpp
+            src/Lexers/CPPLexer.cpp)
+list (APPEND SRCS ${LEXERS_SRCS})
+source_group (Lexers FILES ${LEXERS_SRCS})
+
 # Configure test data directory path
 set (TESTDATA_SIMPLEFILE "${CMAKE_SOURCE_DIR}/TestData/SimpleFile.cpp")
 configure_file (${CMAKE_SOURCE_DIR}/TestData/config_template.hpp ${CMAKE_BINARY_DIR}/Configuration/config.hpp)

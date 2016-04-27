@@ -44,13 +44,13 @@ namespace varco {
     std::function<void(SkScalar)> m_sliderChangeCallback;
     bool m_sliderIsBeingDragged = false;
     SkPoint m_mouseTrackingStartPoint;
-    int m_mouseTrackingStartValue;
+    SkScalar m_mouseTrackingStartValue;
 
     int  m_maxViewVisibleLines; // Lines that the current view of the text control can visualize
     int  m_internalLineCount;   // Real lines of the document (not multiplied by m_textLineHeight)
 
     int  m_maximum; // Last document line index we're allowed to scroll to
-    int  m_value = 0;   // Current document line index we're at (or where the slider is from the start)
+    SkScalar  m_value = 0.f;   // Current document offset we're at (or where the slider is from the start)
 
     SkScalar  m_lineHeightPixels;
   };

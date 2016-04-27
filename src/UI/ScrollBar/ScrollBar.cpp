@@ -74,7 +74,7 @@ namespace varco {
     // or equal to the line we're scrolled at), the position of the slider is:
     //   slider_position = view_height * (line_where_the_view_is_scrolled / total_number_of_lines_in_the_document)
     // in this case we calculate a "relative" position by using value() and maximum() which are relative to the control (not to the document)
-    float viewRelativePos = float(m_maxViewVisibleLines) * (float(m_value) / float(m_maximum + 1 + extraBottomLines));
+    float viewRelativePos = float(m_maxViewVisibleLines) * (m_value / float(m_maximum + 1 + extraBottomLines));
 
     // now find the absolute position in the control's rect, the proportion is:
     //  rect().height() : x = m_maxViewVisibleLines : viewRelativePos
@@ -163,9 +163,9 @@ namespace varco {
       m_parentContainer.startMouseCapture();
     } else {
       // A click was detected but NOT on the slider. Move the slider at the click position
-      int y = static_cast<int>(relativeToParentCtrl.y() * m_internalLineCount / getRect().height());
-      m_value = clamp(y, 0, m_maximum);
-      m_sliderChangeCallback((SkScalar(m_value) / SkScalar(m_maximum)) * m_internalLineCount); // Signal to the parent that slider has changed
+      SkScalar y = relativeToParentCtrl.y() * m_internalLineCount / getRect().height();
+      m_value = clamp(y, 0.f, static_cast<SkScalar>(m_maximum));
+      m_sliderChangeCallback((SkScalar(m_value) / SkScalar(m_maximum)) * (m_internalLineCount - 1)); // Signal to the parent that slider has changed
     }
     m_dirty = true;
     m_parentContainer.repaint();
@@ -186,8 +186,8 @@ namespace varco {
       // x : m_internalLineCount = delta : (this->rect().height() - sliderLength)
       auto delta = (relativeToParentCtrl.y() - m_mouseTrackingStartPoint.y());
       int y = static_cast<int>(delta * m_internalLineCount / (getRect(absoluteRect).height() - m_slider.m_length));
-      m_value = clamp(m_mouseTrackingStartValue + y, 0, m_maximum);
-      m_sliderChangeCallback((SkScalar(m_value) / SkScalar(m_maximum)) * m_internalLineCount); // Signal to the parent that slider has changed
+      m_value = clamp(m_mouseTrackingStartValue + y, 0.f, static_cast<SkScalar>(m_maximum));
+      m_sliderChangeCallback((m_value / static_cast<SkScalar>(m_maximum)) * (m_internalLineCount - 1)); // Signal to the parent that slider has changed
     }
 
     m_dirty = true;
