@@ -30,9 +30,11 @@ namespace varco {
     
     virtual void draw(SkCanvas& canvas) = 0;
     void repaint();
+    virtual void onMouseMove(SkScalar x, SkScalar y) = 0;
     virtual void onLeftMouseDown(SkScalar x, SkScalar y) = 0;
     virtual void onLeftMouseMove(SkScalar x, SkScalar y) = 0;
     void startMouseCapture();
+    void stopMouseCapture();
     virtual void onMouseLeave() = 0;
     virtual void onLeftMouseUp(SkScalar x, SkScalar y) = 0;
     virtual void onKeyDown(VirtualKeycode key) = 0;
@@ -61,6 +63,8 @@ namespace varco {
 
     void paint(HDC hdc, bool aero = false);
     void resize(int width, int height);
+
+    bool mouseCaptureActive = false;
 
     std::unique_ptr<SkSurface> surface;
 

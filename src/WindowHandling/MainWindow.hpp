@@ -25,12 +25,14 @@ namespace varco {
 
     void draw(SkCanvas& canvas) override;
     void repaint() override;
+    void onMouseMove(SkScalar x, SkScalar y) override;
     void onLeftMouseDown(SkScalar x, SkScalar y) override;
     void onLeftMouseMove(SkScalar x, SkScalar y) override;
     void onMouseLeave();
     void onLeftMouseUp(SkScalar x, SkScalar y) override;
     void onKeyDown(VirtualKeycode key) override;
     void startMouseCapture() override;
+    void stopMouseCapture() override;
 
   private:
     TabBar m_tabCtrl;

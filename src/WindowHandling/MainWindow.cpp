@@ -33,6 +33,10 @@ namespace varco {
     BaseOSWindow::repaint();
   }
 
+  void MainWindow::onMouseMove(SkScalar x, SkScalar y) {
+    // [] Other controls' tests should go here
+  }
+
   // Main window drawing entry point
   void MainWindow::draw(SkCanvas& canvas) {
     // Clear background color
@@ -46,7 +50,7 @@ namespace varco {
     canvas.drawBitmap(m_tabCtrl.getBitmap(), m_tabCtrl.getRect().left(),
                       m_tabCtrl.getRect().top());
 
-    // Calculate CodeView region
+    // Calculate CodeView region in the remaining space
     SkRect codeEditCtrlRect = SkRect::MakeLTRB(0, 33.0f, (SkScalar)this->Width, (SkScalar)this->Height);
     // Draw the TabBar region if needed
     m_codeEditCtrl.resize(codeEditCtrlRect);
@@ -67,13 +71,13 @@ namespace varco {
   }
 
   void MainWindow::onLeftMouseMove(SkScalar x, SkScalar y) {
-
+    
     // Forward the event to a container control
     if (isPointInsideRect(x, y, m_tabCtrl.getRect()))
       m_tabCtrl.onLeftMouseMove(x, y);
     else if (m_tabCtrl.isTrackingActive() == true)
       m_tabCtrl.stopTracking();
-    else if (isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
+    else if (m_codeEditCtrl.isTrackingActive() || isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
       m_codeEditCtrl.onLeftMouseMove(x, y);
 
     // [] Other controls' tests should go here
@@ -89,7 +93,7 @@ namespace varco {
     // Forward the event to a container control
     if (isPointInsideRect(x, y, m_tabCtrl.getRect()))
       m_tabCtrl.onLeftMouseUp(x, y);
-    else if (isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
+    else if (m_codeEditCtrl.isTrackingActive() || isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
       m_codeEditCtrl.onLeftMouseUp(x, y);
 
     // [] Other controls' tests should go here
@@ -106,6 +110,10 @@ namespace varco {
 
   void MainWindow::startMouseCapture() {
     BaseOSWindow::startMouseCapture();
+  }
+
+  void MainWindow::stopMouseCapture() {
+    BaseOSWindow::stopMouseCapture();
   }
 
 } // namespace varco

@@ -6,6 +6,8 @@
 #include <GL/gl.h>
 #include <stdexcept>
 
+#include <sstream> // DEBUG
+
 // Specify the windows subsystem
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
 
@@ -214,9 +216,8 @@ namespace varco {
       } break;
 
       case WM_LBUTTONDOWN: {
-        auto x = LOWORD(lParam);
-        auto y = HIWORD(lParam);
-        this->onLeftMouseDown(x, y);
+        auto coords = MAKEPOINTS(lParam);
+        this->onLeftMouseDown(coords.x, coords.y);
       } break;
 
       case WM_KEYDOWN: {
@@ -224,11 +225,13 @@ namespace varco {
       } break;
 
       case WM_MOUSEMOVE: {
-        if (wParam & MK_LBUTTON) { // Left mouse is down
-          auto x = LOWORD(lParam);
-          auto y = HIWORD(lParam);
-          this->onLeftMouseMove(x, y);
-        }
+        auto coords = MAKEPOINTS(lParam); // Always relative to top-left of the window
+                                          // even if out-of-window tracking is active
+
+        if (wParam & MK_LBUTTON) // Left mouse is down          
+          this->onLeftMouseMove(coords.x, coords.y);
+
+        this->onMouseMove(coords.x, coords.y);
       } break;
 
       case WM_MOUSELEAVE: {
@@ -236,9 +239,8 @@ namespace varco {
       } break;
 
       case WM_LBUTTONUP: {
-        auto x = LOWORD(lParam);
-        auto y = HIWORD(lParam);
-        this->onLeftMouseUp(x, y);
+        auto coords = MAKEPOINTS(lParam);
+        this->onLeftMouseUp(coords.x, coords.y);
       } break;
 
       /*case WM_SIZING: {
@@ -286,12 +288,21 @@ namespace varco {
     return DefWindowProc(hWnd, message, wParam, lParam);
   }
 
-  void BaseOSWindow::startMouseCapture() { // Track the mouse to be notified when it leaves the client area
+  void BaseOSWindow::startMouseCapture() {
+    // Track the mouse to be notified when it leaves the client area
     TRACKMOUSEEVENT tme;
     tme.cbSize = sizeof(TRACKMOUSEEVENT);
     tme.dwFlags = TME_LEAVE;
     tme.hwndTrack = this->hWnd;
     TrackMouseEvent(&tme);
+    // Activate mouse tracking also outside of the window area
+    SetCapture(this->hWnd);
+    mouseCaptureActive = true;
+  }
+
+  void BaseOSWindow::stopMouseCapture() {
+    ReleaseCapture();
+    mouseCaptureActive = false;
   }
 
   void BaseOSWindow::repaint() {

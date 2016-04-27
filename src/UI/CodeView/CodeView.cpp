@@ -32,7 +32,10 @@ namespace varco {
     m_characterHeightPixels = m_fontPaint.getFontSpacing();
 
     // Create the vertical scrollbar
-    m_verticalScrollBar = std::make_unique<ScrollBar>(*this);
+    m_verticalScrollBar = std::make_unique<ScrollBar>(*this, [&](int line) {
+      // Callback for line changed by the slider
+      setCurrentLine(line);
+    });
     m_verticalScrollBar->setLineHeightPixels(m_characterHeightPixels);
   }
 
@@ -41,7 +44,7 @@ namespace varco {
 
     // Recalculate and resize scrollbar control
     SkRect scrollBarRect = SkRect::MakeLTRB(m_rect.fRight - (SkScalar)VSCROLLBAR_WIDTH,
-                                            0.f, m_rect.fRight, m_rect.fBottom);
+                                            0.f, m_rect.fRight, m_rect.height());
     m_verticalScrollBar->resize(scrollBarRect);
 
     m_codeViewInitialized = true; // From now on we have valid buffer and size
@@ -114,6 +117,14 @@ namespace varco {
     return m_codeViewInitialized;
   }
 
+  // Checks if tracking is active inside the control or on one of the scrollbars
+  bool CodeView::isTrackingActive() const {
+    bool active = false;
+    if (m_verticalScrollBar && m_verticalScrollBar->isTrackingActive())
+      active = true;
+    return active;
+  }
+
   void CodeView::onLeftMouseDown(SkScalar x, SkScalar y) {
     
     SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);
@@ -125,15 +136,23 @@ namespace varco {
   void CodeView::onLeftMouseMove(SkScalar x, SkScalar y) {
     SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);
 
-    if (m_verticalScrollBar && isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(), m_verticalScrollBar->getRect(relativeToParentRect)))
+    if (m_verticalScrollBar && 
+        (m_verticalScrollBar->isTrackingActive() || isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(), 
+                                                                      m_verticalScrollBar->getRect(relativeToParentRect))))
       m_verticalScrollBar->onLeftMouseMove(relativeToParentCtrl.x(), relativeToParentCtrl.y());
   }
 
   void CodeView::onLeftMouseUp(SkScalar x, SkScalar y) {
     SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);
 
-    if (m_verticalScrollBar && isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(), m_verticalScrollBar->getRect(relativeToParentRect)))
+    if (m_verticalScrollBar &&
+        (m_verticalScrollBar->isTrackingActive() || isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(),
+                                                                      m_verticalScrollBar->getRect(relativeToParentRect))))
       m_verticalScrollBar->onLeftMouseUp(relativeToParentCtrl.x(), relativeToParentCtrl.y());
+  }
+
+  // Change the current line to the specified one
+  void CodeView::setCurrentLine(int line) {
   }
 
   void CodeView::paint() {
@@ -221,7 +240,16 @@ namespace varco {
 
   void CodeView::repaint() {
     // Signals the container to repaint
+    m_dirty = true;
     m_parentContainer.repaint();
+  }
+
+  void CodeView::startMouseCapture() {
+    m_parentContainer.startMouseCapture();
+  }
+
+  void CodeView::stopMouseCapture() {
+    m_parentContainer.stopMouseCapture();
   }
 
 }

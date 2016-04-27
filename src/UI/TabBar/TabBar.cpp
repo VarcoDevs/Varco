@@ -464,6 +464,7 @@ namespace varco {
 
     tabs[selectedTabIndex].dirty = true;
     m_dirty = true;
+    m_parentContainer.stopMouseCapture();
     m_parentContainer.repaint();
   }
 

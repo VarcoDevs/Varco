@@ -3,6 +3,7 @@
 
 #include <UI/UIElement.hpp>
 #include <SkPath.h>
+#include <functional>
 
 namespace varco {
 
@@ -15,15 +16,15 @@ namespace varco {
 
     ScrollBar& m_parent;
     SkPath   m_path; // The path where clicks and inputs are accepted
-    SkScalar m_lenSlider;
-    SkRect   m_sliderRect;
+    SkScalar m_length;
+    SkRect   m_rect;
   };
 
   class CodeView;
 
   class ScrollBar : public UIElement<ui_control_tag> {
   public:
-    ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView);
+    ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView, std::function<void(int)> sliderChangeCallback);
 
     void paint() override;
 
@@ -34,17 +35,24 @@ namespace varco {
     void setLineHeightPixels(SkScalar height);
     void documentSizeChanged(const int width_in_characters, const int height_in_lines);
 
+    bool isTrackingActive() const;
+
   private:
     UIElement<ui_container_tag, ui_control_tag>& m_parentControlContainer;
+
     Slider m_slider;
+    std::function<void(int)> m_sliderChangeCallback;
+    bool m_sliderIsBeingDragged = false;
+    SkPoint m_mouseTrackingStartPoint;
+    int m_mouseTrackingStartValue;
 
     int  m_maxViewVisibleLines; // Lines that the current view of the text control can visualize
     int  m_internalLineCount;   // Real lines of the document (not multiplied by m_textLineHeight)
 
     int  m_maximum; // Last document line index we're allowed to scroll to
-    int  m_value = 0;   // Current document line index we're at
+    int  m_value = 0;   // Current document line index we're at (or where the slider is from the start)
 
-    SkScalar  m_lineHeightPixels;    
+    SkScalar  m_lineHeightPixels;
   };
 
 }

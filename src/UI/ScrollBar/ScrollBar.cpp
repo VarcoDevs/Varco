@@ -1,4 +1,5 @@
 #include <UI/ScrollBar/ScrollBar.hpp>
+#include <Utils/Utils.hpp>
 #include <Document/Document.hpp>
 #include <SkCanvas.h>
 #include <SkPaint.h>
@@ -10,9 +11,11 @@ namespace varco {
   Slider::Slider(ScrollBar& parent)
     : m_parent(parent) {}
 
-  ScrollBar::ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView)
-    : m_parentControlContainer(codeView), UIElement(codeView),
+  ScrollBar::ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView, std::function<void(int)> sliderChangeCallback)
+    : UIElement(static_cast<UIElement<ui_container_tag>&>(codeView)),
+      m_parentControlContainer(codeView),
       m_slider(*this),
+      m_sliderChangeCallback(std::move(sliderChangeCallback)),
       m_lineHeightPixels(1), // Height of every line, it depends on the font used (although it's always monospaced)
       m_internalLineCount(1) // How many lines are actually in the document
   {}
@@ -37,6 +40,10 @@ namespace varco {
     m_dirty = true; // Control needs to be redrawn and slider position to be recalculated
   }
 
+  bool ScrollBar::isTrackingActive() const {
+    return m_sliderIsBeingDragged;
+  }
+
   // The fundamental equation to repaint the scrollbar is:
   //  slider_length = maximum_slider_height * (how_many_lines_I_can_display_in_the_view / total_number_of_lines_in_the_document)
   void ScrollBar::paint() {
@@ -53,10 +60,11 @@ namespace varco {
     //////////////////////////////////////////////////////////////////////
     canvas.clear(0x00000000); // ARGB
 
-
     // >> ---------------------------------------------------------------------
     //    Calculate the position, length and drawing area for the slider
     // --------------------------------------------------------------------  <<
+
+    SkRect scrollbarRect = this->getRect(absoluteRect);
 
     // extraBottomLines are virtual lines to let the last line of text be scrollable till it is left as the only one above in the view.
     // Thus they correspond to the maximum number of lines that the view can visualize - 1 (the one I want is excluded)
@@ -66,27 +74,22 @@ namespace varco {
     // or equal to the line we're scrolled at), the position of the slider is:
     //   slider_position = view_height * (line_where_the_view_is_scrolled / total_number_of_lines_in_the_document)
     // in this case we calculate a "relative" position by using value() and maximum() which are relative to the control (not to the document)
-    float viewRelativePos = float(m_maxViewVisibleLines) * (float(m_value) / float(m_maximum + extraBottomLines));
+    float viewRelativePos = float(m_maxViewVisibleLines) * (float(m_value) / float(m_maximum + 1 + extraBottomLines));
 
     // now find the absolute position in the control's rect, the proportion is:
     //  rect().height() : x = m_maxViewVisibleLines : viewRelativePos
-    float rectAbsPos = (float(m_rect.height()) * viewRelativePos) / float(m_maxViewVisibleLines);
+    float rectAbsPos = (scrollbarRect.height() * viewRelativePos) / float(m_maxViewVisibleLines);
 
     // Calculate the length of the slider's rect including extraBottomLines
-    m_slider.m_lenSlider = m_rect.height() * (float(m_maxViewVisibleLines) / float(m_internalLineCount + extraBottomLines));
+    m_slider.m_length = scrollbarRect.height() * (float(m_maxViewVisibleLines) / float(m_internalLineCount + extraBottomLines));
 
     // Set a mimumim length for the slider (when there are LOTS of lines)
-    if (m_slider.m_lenSlider < 15.f)
-      m_slider.m_lenSlider = 15.f;
-
-    // Prevents the slider to be drawn, due to roundoff errors, outside the scrollbar rectangle
-    if (rectAbsPos + m_slider.m_lenSlider > m_rect.height())
-      rectAbsPos -= (rectAbsPos + m_slider.m_lenSlider) - m_rect.height();
+    if (m_slider.m_length < 15.f)
+      m_slider.m_length = 15.f;
 
     // This is finally the drawing area for the slider (store it for hit tests)
-    m_slider.m_sliderRect = SkRect::MakeLTRB(0.f, rectAbsPos, m_rect.width() - 1.f, m_slider.m_lenSlider);    
-
-    SkRect scrollbarRect = this->getRect(absoluteRect);
+    m_slider.m_rect = SkRect::MakeLTRB(0.f, scrollbarRect.fTop + rectAbsPos, scrollbarRect.width() - 1.f, 
+                                       scrollbarRect.fTop + rectAbsPos + m_slider.m_length);
 
     // A separation line of 1 px
     {
@@ -118,9 +121,9 @@ namespace varco {
     // -----------------------  <<
 
     // Draws the slider with a rounded rectangle
-    // m_sliderRect is the hitbox, but to draw it we only take a width subsection
+    // m_rect is the hitbox, but to draw it we only take a width subsection
     {
-      SkRect rcSliderSubsection(m_slider.m_sliderRect);
+      SkRect rcSliderSubsection(m_slider.m_rect);
       rcSliderSubsection.fLeft += 3.f;
       rcSliderSubsection.fRight -= 2.f;
       m_slider.m_path.reset();
@@ -131,8 +134,8 @@ namespace varco {
     SkPaint fillGradient;
     {
       SkPoint leftToRightPoints[2] = {
-        SkPoint::Make(m_slider.m_sliderRect.fLeft, m_slider.m_sliderRect.fTop),
-        SkPoint::Make(m_slider.m_sliderRect.fRight, m_slider.m_sliderRect.fTop),
+        SkPoint::Make(m_slider.m_rect.fLeft, m_slider.m_rect.fTop),
+        SkPoint::Make(m_slider.m_rect.fRight, m_slider.m_rect.fTop),
       };
       SkColor colors[2] = { SkColorSetARGB(255, 88, 88, 88), SkColorSetARGB(255, 64, 64, 64) };
       auto fillGrad = SkGradientShader::MakeLinear(leftToRightPoints, colors, NULL, 2, SkShader::kClamp_TileMode, 0, NULL);
@@ -151,56 +154,51 @@ namespace varco {
     SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);
 
     // Detect if the click was on the slider
-    if (m_slider.m_path.contains(relativeToParentCtrl.x(), relativeToParentCtrl.y()) == true) {
-      Beep(200, 200);
+    if (m_sliderIsBeingDragged == false && 
+        m_slider.m_path.contains(relativeToParentCtrl.x(), relativeToParentCtrl.y()) == true) 
+    {
+      m_sliderIsBeingDragged = true;
+      m_mouseTrackingStartPoint = relativeToParentCtrl;
+      m_mouseTrackingStartValue = m_value;
+      m_parentContainer.startMouseCapture();
+    } else {
+      // A click was detected but NOT on the slider. Move the slider at the click position
+      int y = static_cast<int>(relativeToParentCtrl.y() * m_internalLineCount / getRect().height());
+      m_value = clamp(y, 0, m_maximum);
+      m_sliderChangeCallback(m_value); // Signal to the parent that slider has changed
     }
-
-
-    //bool redrawNeeded = false;
-    //for (auto i = 0; i < tabs.size(); ++i) {
-    //  Tab& tab = tabs[i];
-
-    //  SkPoint relativeToTab = SkPoint::Make(relativeToTabCtrl.x() - tab.getOffset(), relativeToTabCtrl.y());
-
-    //  if (tab.getPath().contains(relativeToTab.x(), relativeToTab.y()) == true) {
-
-    //    if (tab.getMovementOffset() != 0)
-    //      return; // No dragging when returning to home position
-
-    //    if (selectedTabIndex != i) { // Left click on the already selected tab won't trigger a "selected check"          
-    //      redrawNeeded = true;
-
-    //      if (selectedTabIndex != -1) // Deselect old selected tab
-    //        tabs[selectedTabIndex].setSelected(false);
-
-    //      selectedTabIndex = i;
-    //      tab.setSelected(true);
-    //    }
-
-    //    m_tracking = true;
-    //    m_startXTrackingPosition = x;
-    //    m_parentContainer.startMouseCapture();
-    //  }
-    //}
-
-    //if (redrawNeeded) {
-    //  this->m_dirty = true;
-    //  m_parentContainer.repaint();
-    //}
+    m_dirty = true;
+    m_parentContainer.repaint();
   }
 
-  void ScrollBar::onLeftMouseMove(SkScalar x, SkScalar y) {
-    /*if (!m_tracking)
-      return;
+  // The logic here is the following: if we're tracking the slider, calculate the delta from the tracking start
+  // point and scale it not according to the scrollbar area rectangle, but to the number of lines of the document
+  // (at rect.y == 0 we're at line 0, at rect.y == max we're at line lastLine). Finally add this value to the
+  // slider position that was stored before the tracking (so that we're not modifying its position)
+  void ScrollBar::onLeftMouseMove(SkScalar x, SkScalar y) {    
+    
+    if (m_sliderIsBeingDragged == true) {
+      SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);      
 
-    tabs[selectedTabIndex].trackingOffset = x - m_startXTrackingPosition;
-    tabs[selectedTabIndex].dirty = true;
+      // It is important to note that even if the mouse did a complete document tracking (i.e. from line 0 to the last
+      // one), its path's length would NOT be equal to the control rect().height() since the slider's length would have
+      // to be subtracted. This can be easily visualized on a piece of paper. The right proportion is therefore:
+      // x : m_internalLineCount = delta : (this->rect().height() - sliderLength)
+      auto delta = (relativeToParentCtrl.y() - m_mouseTrackingStartPoint.y());
+      int y = static_cast<int>(delta * m_internalLineCount / (getRect(absoluteRect).height() - m_slider.m_length));
+      m_value = clamp(m_mouseTrackingStartValue + y, 0, m_maximum);
+      m_sliderChangeCallback(m_value); // Signal to the parent that slider has changed
+    }
+
     m_dirty = true;
-    m_parentContainer.repaint();*/
+    m_parentContainer.repaint();
   }
 
   void ScrollBar::onLeftMouseUp(SkScalar x, SkScalar y) {
-    /*stopTracking();*/
+    if (m_sliderIsBeingDragged == true) {
+      m_sliderIsBeingDragged = false;
+      m_parentContainer.stopMouseCapture();
+    }
   }
 
 }

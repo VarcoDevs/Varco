@@ -19,14 +19,20 @@ namespace varco {
     void paint() override;
     void repaint() override;
 
+    void startMouseCapture() override;
+    void stopMouseCapture() override;
+
     void loadDocument(Document& doc);
     SkScalar getCharacterWidthPixels() const;
     bool isControlReady() const;
+    bool isTrackingActive() const;
 
     // These might also forward the event to a scrollbar if present
     void onLeftMouseDown(SkScalar x, SkScalar y);
     void onLeftMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
+    
+    void setCurrentLine(int line);
 
   private:
 
