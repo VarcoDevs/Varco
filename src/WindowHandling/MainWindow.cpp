@@ -18,11 +18,11 @@ namespace varco {
   {
     // DEBUG - Add some debug tabs
     int id = m_tabCtrl.addNewTab("SimpleFile.cpp");
-    auto it = m_tabDocumentMap.emplace(id, Document(m_codeEditCtrl));
-    std::pair<const int, Document>& element = *(it.first);
-    element.second.loadFromFile(TestData::SimpleFile);
+    auto it = m_tabDocumentMap.emplace(id, std::make_unique<Document>(m_codeEditCtrl));
+    Document *document = it.first->second.get();
+    document->loadFromFile(TestData::SimpleFile);
     //it.first->second->applySyntaxHighlight(CPP);
-    m_codeEditCtrl.loadDocument(element.second);
+    m_codeEditCtrl.loadDocument(*document);
     
     //tabCtrl.addNewTab("Second tab");
     //tabCtrl.addNewTab("Third tab");

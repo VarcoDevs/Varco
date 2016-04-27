@@ -1,6 +1,7 @@
 #ifndef VARCO_DOCUMENT_HPP
 #define VARCO_DOCUMENT_HPP
 
+#include <UI/UIElement.hpp>
 #include <vector>
 #include <string>
 
@@ -26,8 +27,8 @@ namespace varco {
   };
 
   struct PhysicalLine {
-    PhysicalLine(EditorLine&& editorLine) {
-      m_editorLines.emplace_back(std::forward<EditorLine>(editorLine));
+    PhysicalLine(EditorLine editorLine) {
+      m_editorLines.emplace_back(std::move(editorLine));
     }
     PhysicalLine(const PhysicalLine&) = default;
     PhysicalLine() = default;
@@ -37,9 +38,9 @@ namespace varco {
 
   class CodeView;
 
-  class Document {
+  class Document : public UIElement<ui_control_tag> {
   public:
-    Document(const CodeView& codeView);
+    Document(CodeView& codeView);    
 
     bool loadFromFile(std::string file);
 
@@ -49,15 +50,18 @@ namespace varco {
     void setWrapWidth(int width);
     void recalculateDocumentLines();
 
-    const CodeView& m_codeView;
+    void paint() override; // Renders the entire document on its bitmap
+
+    CodeView& m_codeView;
     std::vector<std::string> m_plainTextLines;
     std::vector<PhysicalLine> m_physicalLines;
 
     // Variables related to how the control renders lines
-    int m_characterWidthPixels;
+    SkScalar m_characterWidthPixels;
+    SkScalar m_characterHeightPixels;
     int m_wrapWidth = -1;
     int m_numberOfEditorLines;
-    int m_maximumCharactersLine; // According to wrapWidth
+    int m_maximumCharactersLine; // According to wrapWidth    
   };
 
 }

@@ -11,7 +11,7 @@ namespace varco {
   Slider::Slider(ScrollBar& parent)
     : m_parent(parent) {}
 
-  ScrollBar::ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView, std::function<void(int)> sliderChangeCallback)
+  ScrollBar::ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView, std::function<void(SkScalar)> sliderChangeCallback)
     : UIElement(static_cast<UIElement<ui_container_tag>&>(codeView)),
       m_parentControlContainer(codeView),
       m_slider(*this),
@@ -25,14 +25,14 @@ namespace varco {
   }
 
   // Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active
-  void ScrollBar::documentSizeChanged(const int width_in_characters, const int height_in_line) {
+  void ScrollBar::documentSizeChanged(const int width_in_characters, const int height_in_lines) {
     
     auto codeViewHeight = m_parentControlContainer.getRect(absoluteRect).height();
     // Update the maximum number of visible lines in the text control, this might have changed
     m_maxViewVisibleLines = static_cast<int>(codeViewHeight / m_lineHeightPixels);
 
     // Store the real number of lines in the document
-    m_internalLineCount = height_in_line;
+    m_internalLineCount = height_in_lines;
 
     // Also update the maximum allowed to let the last line to be scrolled till the beginning of the view
     m_maximum = m_internalLineCount - 1;
@@ -165,7 +165,7 @@ namespace varco {
       // A click was detected but NOT on the slider. Move the slider at the click position
       int y = static_cast<int>(relativeToParentCtrl.y() * m_internalLineCount / getRect().height());
       m_value = clamp(y, 0, m_maximum);
-      m_sliderChangeCallback(m_value); // Signal to the parent that slider has changed
+      m_sliderChangeCallback((SkScalar(m_value) / SkScalar(m_maximum)) * m_internalLineCount); // Signal to the parent that slider has changed
     }
     m_dirty = true;
     m_parentContainer.repaint();
@@ -187,7 +187,7 @@ namespace varco {
       auto delta = (relativeToParentCtrl.y() - m_mouseTrackingStartPoint.y());
       int y = static_cast<int>(delta * m_internalLineCount / (getRect(absoluteRect).height() - m_slider.m_length));
       m_value = clamp(m_mouseTrackingStartValue + y, 0, m_maximum);
-      m_sliderChangeCallback(m_value); // Signal to the parent that slider has changed
+      m_sliderChangeCallback((SkScalar(m_value) / SkScalar(m_maximum)) * m_internalLineCount); // Signal to the parent that slider has changed
     }
 
     m_dirty = true;

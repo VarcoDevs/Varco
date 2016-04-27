@@ -2,6 +2,7 @@
 #include <Utils/Utils.hpp>
 #include <SkCanvas.h>
 #include <SkTypeface.h>
+#include <algorithm>
 
 namespace varco {
 
@@ -32,9 +33,8 @@ namespace varco {
     m_characterHeightPixels = m_fontPaint.getFontSpacing();
 
     // Create the vertical scrollbar
-    m_verticalScrollBar = std::make_unique<ScrollBar>(*this, [&](int line) {
-      // Callback for line changed by the slider
-      setCurrentLine(line);
+    m_verticalScrollBar = std::make_unique<ScrollBar>(*this, [&](SkScalar value) {
+      setViewportYOffset(value);
     });
     m_verticalScrollBar->setLineHeightPixels(m_characterHeightPixels);
   }
@@ -50,13 +50,18 @@ namespace varco {
     m_codeViewInitialized = true; // From now on we have valid buffer and size
 
     // Calculate new wrap width (allow space for the vertical scrollbar if present)
-    auto newWrapWidth = static_cast<int>(rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
+    m_wrapWidthInCharacters = static_cast<int>(rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
 
     // If we have a document and we need to recalculate the wrapwidth
-    if (m_document != nullptr && newWrapWidth != m_document->m_wrapWidth) {
+    if (m_document != nullptr && m_wrapWidthInCharacters != m_document->m_wrapWidth) {
       
-      m_document->setWrapWidth(newWrapWidth);      
+      m_document->setWrapWidth(m_wrapWidthInCharacters);
       m_document->recalculateDocumentLines();
+
+      // Resize the document bitmap to fit the new render that will take place
+      SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInCharacters * getCharacterWidthPixels() + 5.f,
+                                        m_document->m_numberOfEditorLines * getCharacterHeightPixels() + 20.f);
+      m_document->resize(newRect);
 
       // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
       m_verticalScrollBar->documentSizeChanged(m_document->m_maximumCharactersLine, 
@@ -76,6 +81,11 @@ namespace varco {
     m_document->setWrapWidth(newWrapWidth);
     // Calculate the new document size
     m_document->recalculateDocumentLines();
+
+    // Resize the document bitmap to fit the new render that will take place
+    SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInCharacters * getCharacterWidthPixels() + 5.f,
+                                      m_document->m_numberOfEditorLines * getCharacterHeightPixels() + 20.f);
+    m_document->resize(newRect);
 
     // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
     m_verticalScrollBar->documentSizeChanged(m_document->m_maximumCharactersLine, 
@@ -111,6 +121,10 @@ namespace varco {
 
   SkScalar CodeView::getCharacterWidthPixels() const {
     return m_characterWidthPixels;
+  }
+
+  SkScalar CodeView::getCharacterHeightPixels() const {
+    return m_characterHeightPixels;
   }
 
   bool CodeView::isControlReady() const {
@@ -151,8 +165,11 @@ namespace varco {
       m_verticalScrollBar->onLeftMouseUp(relativeToParentCtrl.x(), relativeToParentCtrl.y());
   }
 
-  // Change the current line to the specified one
-  void CodeView::setCurrentLine(int line) {
+  // Change the Y offset to the specified one from the beginning of a document (receives a percentage of the total document size)
+  void CodeView::setViewportYOffset(SkScalar percentage) {
+    m_currentYPercentage = percentage;
+    m_dirty = true;
+    m_parentContainer.repaint();
   }
 
   void CodeView::paint() {
@@ -180,59 +197,41 @@ namespace varco {
     // Draw the vertical scrollbar
     //////////////////////////////////////////////////////////////////////
     {
-      m_verticalScrollBar->paint();
-      canvas.drawBitmap(m_verticalScrollBar->getBitmap(), m_verticalScrollBar->getRect(relativeToParentRect).fLeft,
-                        m_verticalScrollBar->getRect(relativeToParentRect).fTop);
+      if (m_verticalScrollBar) {
+        m_verticalScrollBar->paint();
+        canvas.drawBitmap(m_verticalScrollBar->getBitmap(), m_verticalScrollBar->getRect(relativeToParentRect).fLeft,
+                          m_verticalScrollBar->getRect(relativeToParentRect).fTop);
+      }
     }
 
     if (m_document == nullptr)
       return; // Nothing to display
 
-    struct {
-      float x;
-      float y;
-    } startpoint = { 5, 20 };
+    //////////////////////////////////////////////////////////////////////
+    // Render and draw the requested portion of the document
+    //////////////////////////////////////////////////////////////////////
 
-    size_t documentRelativePos = 0;
-    size_t lineRelativePos = 0;
+    m_document->paint();
 
-    m_fontPaint.setColor(SK_ColorWHITE);
+    // Only draw things which intersect the current viewport region
+    SkScalar verticalScrollbarWidth = 0.f;
+    if (m_verticalScrollBar)
+      verticalScrollbarWidth = m_verticalScrollBar->getRect(absoluteRect).width();
 
-    // Implement the main rendering loop algorithm which renders characters segment by segment
-    // on the viewport area
-    for (auto& pl : m_document->m_physicalLines) {
+    auto documentYoffset = (m_currentYPercentage ) * m_document->m_characterHeightPixels;
 
-      size_t editorLineIndex = 0; // This helps tracking the last EditorLine of a PhysicalLine
-      for (auto& el : pl.m_editorLines) {
-        ++editorLineIndex;
+    SkRect viewportRect = SkRect::MakeLTRB(getRect(absoluteRect).fLeft, getRect(absoluteRect).fTop,
+                                           getRect(absoluteRect).fRight - verticalScrollbarWidth, getRect(absoluteRect).fBottom);
 
-        do {
-          startpoint.x = 5.f + lineRelativePos * m_characterWidthPixels;
+    SkRect documentViewRect = SkRect::MakeLTRB(0.f, documentYoffset, std::min(viewportRect.width(), m_document->getRect(absoluteRect).width()),
+                                               std::min(documentYoffset + viewportRect.height(), m_document->getRect(absoluteRect).fBottom));
+    viewportRect.fBottom = std::min(documentViewRect.height(), viewportRect.height());
 
-
-            // Multiple lines will have to be rendered, just render this till the end and continue
-
-            int charsRendered = 0;
-            if (el.m_characters.size() > 0) { // Empty lines must be skipped
-              std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
-
-              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, m_fontPaint);
-              //painter.drawText(tpoint, ts);
-              charsRendered = (int)ts.size();
-            }
-
-            lineRelativePos = 0; // Next editor line will just start from the beginning
-            documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
-              (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
-
-            break; // Go and fetch a new line for the next cycle
-
-        } while (true);
-
-        // Move the rendering cursor (carriage-return)
-        startpoint.y = startpoint.y + m_characterHeightPixels;
-      }
-    }
+    // Start bitblitting from the current requested line position
+    canvas.drawBitmapRect(m_document->getBitmap(), documentViewRect, viewportRect, nullptr);
+    //canvas.drawBitmap(m_document->getBitmap(), m_document->getRect(absoluteRect).fLeft,
+    //                  m_verticalScrollBar->getRect(absoluteRect).fTop + documentYoffset);
+    
 
     canvas.flush();
 

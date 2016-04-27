@@ -11,6 +11,7 @@
 #include <Document/Document.hpp>
 #include <SkCanvas.h>
 #include <map>
+#include <memory>
 
 namespace varco {
 
@@ -39,7 +40,7 @@ namespace varco {
     CodeView m_codeEditCtrl;
 
     // A map that stores the association between a tab and a document
-    std::map<int, Document> m_tabDocumentMap;
+    std::map<int, std::unique_ptr<Document>> m_tabDocumentMap;
   };
 
 }

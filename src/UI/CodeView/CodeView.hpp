@@ -24,6 +24,7 @@ namespace varco {
 
     void loadDocument(Document& doc);
     SkScalar getCharacterWidthPixels() const;
+    SkScalar getCharacterHeightPixels() const;
     bool isControlReady() const;
     bool isTrackingActive() const;
 
@@ -32,9 +33,10 @@ namespace varco {
     void onLeftMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
     
-    void setCurrentLine(int line);
+    void setViewportYOffset(SkScalar percentage);
 
   private:
+    friend class Document;
 
     Document *m_document = nullptr;
     std::unique_ptr<ScrollBar> m_verticalScrollBar;
@@ -43,8 +45,11 @@ namespace varco {
     SkPaint m_fontPaint; // Paint data for the font
 
     SkScalar m_characterWidthPixels, m_characterHeightPixels;
+    int m_wrapWidthInCharacters = 0;
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
-                                                             // documents as soon as the first resize happens
+                                        // documents as soon as the first resize happens
+
+    SkScalar m_currentYPercentage = 0; // Y offset percentage in the current document
   };
 
 }

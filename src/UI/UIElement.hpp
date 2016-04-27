@@ -33,9 +33,6 @@ namespace varco {
     explicit UIElement(UIElement<ui_container_tag>& parentContainer) : // Should not be instantiated directly
       m_parentContainer(parentContainer) {}
 
-    UIElement(const UIElement&) = delete;
-    UIElement(UIElement&&) = delete;
-
     virtual ~UIElement() = default;
 
     UIElement<ui_container_tag>& m_parentContainer;

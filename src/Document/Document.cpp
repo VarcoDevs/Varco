@@ -1,6 +1,7 @@
 #include <Document/Document.hpp>
 #include <UI/CodeView/CodeView.hpp>
 #include <Utils/Concurrent.hpp>
+#include <SkCanvas.h>
 #include <fstream>
 #include <regex>
 #include <functional>
@@ -14,8 +15,8 @@ namespace varco {
     std::copy(str.begin(), str.end(), m_characters.begin());
   }
 
-  Document::Document(const CodeView& codeView)
-    : m_codeView(codeView)
+  Document::Document(CodeView& codeView)
+    : UIElement(static_cast<UIElement<ui_container_tag>&>(codeView)), m_codeView(codeView)
   {}
 
   // The following function loads the contents of a text file into memory.
@@ -47,6 +48,8 @@ namespace varco {
   }
 
   void Document::setWrapWidth(int width) {
+    if (m_wrapWidth != width)
+      m_dirty = true;
     m_wrapWidth = width;
   }  
 
@@ -54,6 +57,10 @@ namespace varco {
 
     if (!m_codeView.isControlReady())
       return; // A document can be loaded at any time
+
+    // Load parameters from codeview parent
+    m_characterWidthPixels = m_codeView.getCharacterWidthPixels();
+    m_characterHeightPixels = m_codeView.getCharacterHeightPixels();
 
     // TODO lexing
 
@@ -135,7 +142,76 @@ namespace varco {
 
     };
 
-    m_physicalLines = blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 30U);
+    m_physicalLines = std::move(blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 30U));    
+  }
+
+  void Document::paint() {
+    if (!m_dirty)
+      return;
+
+    m_dirty = false; // It will be false at the end of this function, unless overridden
+
+    SkCanvas canvas(this->m_bitmap);
+    SkRect rect = getRect(absoluteRect); // Drawing is performed on the bitmap - absolute rect
+
+    canvas.save();
+
+    //////////////////////////////////////////////////////////////////////
+    // Draw the background of the control
+    //////////////////////////////////////////////////////////////////////
+    {
+      SkPaint background;
+      background.setColor(SkColorSetARGB(255, 39, 40, 34));
+      canvas.drawRect(rect, background);
+    }    
+
+    size_t documentRelativePos = 0;
+    size_t lineRelativePos = 0;
+
+    m_codeView.m_fontPaint.setColor(SK_ColorWHITE);
+
+    struct {
+      float x;
+      float y;
+    } startpoint = { 5, 20 }; // Start point where to start rendering
+
+    // Implement the main rendering loop algorithm which renders characters segment by segment
+    // on the viewport area
+    for (auto& pl : m_physicalLines) {
+
+      size_t editorLineIndex = 0; // This helps tracking the last EditorLine of a PhysicalLine
+      for (auto& el : pl.m_editorLines) {
+        ++editorLineIndex;
+
+        do {
+          startpoint.x = 5.f + lineRelativePos * m_characterWidthPixels;
+
+
+          // Multiple lines will have to be rendered, just render this till the end and continue
+
+          int charsRendered = 0;
+          if (el.m_characters.size() > 0) { // Empty lines must be skipped
+            std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
+
+            canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, m_codeView.m_fontPaint);
+            //painter.drawText(tpoint, ts);
+            charsRendered = (int)ts.size();
+          }
+
+          lineRelativePos = 0; // Next editor line will just start from the beginning
+          documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
+            (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
+
+          break; // Go and fetch a new line for the next cycle
+
+        } while (true);
+
+        // Move the rendering cursor (carriage-return)
+        startpoint.y = startpoint.y + m_codeView.m_characterHeightPixels;
+      }
+    }
+
+    canvas.flush();
   }
 
 }

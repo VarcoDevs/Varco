@@ -24,7 +24,7 @@ namespace varco {
 
   class ScrollBar : public UIElement<ui_control_tag> {
   public:
-    ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView, std::function<void(int)> sliderChangeCallback);
+    ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView, std::function<void(SkScalar)> sliderChangeCallback);
 
     void paint() override;
 
@@ -41,7 +41,7 @@ namespace varco {
     UIElement<ui_container_tag, ui_control_tag>& m_parentControlContainer;
 
     Slider m_slider;
-    std::function<void(int)> m_sliderChangeCallback;
+    std::function<void(SkScalar)> m_sliderChangeCallback;
     bool m_sliderIsBeingDragged = false;
     SkPoint m_mouseTrackingStartPoint;
     int m_mouseTrackingStartValue;
