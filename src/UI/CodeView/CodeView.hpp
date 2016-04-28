@@ -4,6 +4,7 @@
 #include <UI/UIElement.hpp>
 #include <UI/ScrollBar/ScrollBar.hpp>
 #include <Document/Document.hpp>
+#include <Utils/Concurrent.hpp>
 #include <SkPaint.h>
 #include <memory>
 
@@ -45,11 +46,13 @@ namespace varco {
     SkPaint m_fontPaint; // Paint data for the font
 
     SkScalar m_characterWidthPixels, m_characterHeightPixels;
-    int m_wrapWidthInCharacters = 0;
+    int m_wrapWidthInPixels = 0;
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
                                         // documents as soon as the first resize happens
 
     SkScalar m_currentYoffset = 0; // Y offset percentage in the current document
+
+    ThreadPool<15> m_threadPool;
   };
 
 }

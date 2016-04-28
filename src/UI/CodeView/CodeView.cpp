@@ -50,16 +50,16 @@ namespace varco {
     m_codeViewInitialized = true; // From now on we have valid buffer and size
 
     // Calculate new wrap width (allow space for the vertical scrollbar if present)
-    m_wrapWidthInCharacters = static_cast<int>(rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
+    m_wrapWidthInPixels = static_cast<int>(rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
 
     // If we have a document and we need to recalculate the wrapwidth
-    if (m_document != nullptr && m_wrapWidthInCharacters != m_document->m_wrapWidth) {
+    if (m_document != nullptr && m_wrapWidthInPixels != m_document->m_wrapWidthPixels) {
       
-      m_document->setWrapWidth(m_wrapWidthInCharacters);
+      m_document->setWrapWidthInPixels(m_wrapWidthInPixels);
       m_document->recalculateDocumentLines();
 
       // Resize the document bitmap to fit the new render that will take place
-      SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInCharacters * getCharacterWidthPixels() + 5.f,
+      SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInPixels * getCharacterWidthPixels() + 5.f,
                                         m_document->m_numberOfEditorLines * getCharacterHeightPixels() + 20.f);
       m_document->resize(newRect);
 
@@ -78,12 +78,12 @@ namespace varco {
 
     // Calculate new wrap width (allow space for the vertical scrollbar if present)
     auto newWrapWidth = static_cast<int>(m_rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
-    m_document->setWrapWidth(newWrapWidth);
+    m_document->setWrapWidthInPixels(newWrapWidth);
     // Calculate the new document size
     m_document->recalculateDocumentLines();
 
     // Resize the document bitmap to fit the new render that will take place
-    SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInCharacters * getCharacterWidthPixels() + 5.f,
+    SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInPixels * getCharacterWidthPixels() + 5.f,
                                       m_document->m_numberOfEditorLines * getCharacterHeightPixels() + 20.f);
     m_document->resize(newRect);
 

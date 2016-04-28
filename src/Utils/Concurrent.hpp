@@ -166,6 +166,55 @@ namespace varco {
     return result;
   }
 
+
+  template<size_t N_Threads>
+  class ThreadPool {
+  public:
+    ThreadPool() {
+      for(auto i = 0; i < N_Threads; ++i)
+        m_threads.emplace_back(&ThreadPool::threadMain, this, i);
+    }
+    ~ThreadPool() {
+      m_sigterm = true;
+      for (auto& thread : m_threads) {
+        if (thread.joinable())
+          thread.join();
+      }
+    }
+    void setCallback(std::function<void(size_t)> callback) {
+      m_callback = callback;
+    }
+    void dispatch() {
+      m_workloadReady = true;
+      m_cv.notify_all();
+    }
+
+    static constexpr const size_t m_NThreads = N_Threads;
+
+  private:
+    void threadMain(size_t threadIdx) {
+      while (!m_sigterm) {
+        {
+          std::unique_lock<std::mutex> lock(m_mutex);
+          while (!m_sigterm && !m_workloadReady) {
+            m_cv.wait(lock);
+          }
+        }
+        if (m_sigterm)
+          return;
+
+        m_callback(threadIdx);
+      }
+    }
+
+    std::vector<std::thread> m_threads;
+    bool m_sigterm = false;
+    bool m_workloadReady = false;
+    std::mutex m_mutex;
+    std::condition_variable m_cv;
+    std::function<void(size_t)> m_callback;
+  };
+
 }
 
 

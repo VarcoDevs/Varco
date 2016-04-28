@@ -129,6 +129,7 @@ namespace varco {
     sdb.styleSegment.clear(); // Relex everything // TODO - lex from a position forward?
     styleDb = &sdb;
     pos = 0;
+    curLine = 0;
 
     try {
       globalScope();
@@ -145,8 +146,23 @@ namespace varco {
 
 
   // Utility function: adds a segment to the style database
-  void CPPLexer::addSegment(size_t pos, size_t len, Style style) {
-    styleDb->styleSegment.emplace_back(pos, len, style);
+  void CPPLexer::addSegment(size_t line, size_t pos, size_t len, Style style) {
+    styleDb->styleSegment.emplace_back(line, pos, len, style);
+    // Update acceleration structures for future style queries
+    auto fIt = styleDb->firstSegmentOnLine.find(line);
+    auto lIt = styleDb->lastSegmentOnLine.find(line);
+    if (fIt == styleDb->firstSegmentOnLine.end()) {
+      styleDb->firstSegmentOnLine[line] = styleDb->styleSegment.size() - 1;
+      styleDb->lastSegmentOnLine[line] = styleDb->styleSegment.size() - 1;
+    }
+    if (fIt != styleDb->firstSegmentOnLine.end())
+      styleDb->lastSegmentOnLine[line] = styleDb->styleSegment.size() - 1;
+  }
+
+  // Utility function: increments the current line number if there's a newline at position pos
+  void CPPLexer::incrementLineNumberIfNewline(size_t pos) {
+    if (str->at(pos) == '\n')
+      ++curLine;
   }
 
   void CPPLexer::classDeclarationOrDefinition() {
@@ -156,7 +172,7 @@ namespace varco {
   void CPPLexer::declarationOrDefinition() { // A scope declaration or definition
                                              // of a function, class (or some macro-ed stuff e.g. CALLME();) or local variables
 
-                                             // Skip whitespaces
+    // Skip whitespaces
     while (str->at(pos) == ' ') {
       pos++;
     }
@@ -447,7 +463,7 @@ namespace varco {
     }
     // Do not add the \n to the comment (it will be handled outside)
 
-    addSegment(startSegment, pos - startSegment, Comment);
+    addSegment(curLine, startSegment, pos - startSegment, Comment);
   }
 
 
@@ -483,7 +499,7 @@ namespace varco {
   void CPPLexer::includeStatement() {
     // A statement spans until a newline is found (or EOF)
 
-    addSegment(pos, 8, Keyword); // #include
+    addSegment(curLine, pos, 8, Keyword); // #include
     pos += 8;
 
     // Skip whitespaces, a quoted string is expected
@@ -496,13 +512,15 @@ namespace varco {
       pos++;
 
       while (str->at(pos) != '"') {
-        if (str->at(pos) == '\n')
+        if (str->at(pos) == '\n') {
+          incrementLineNumberIfNewline(pos);
           return; // Interrupt if a newline is found
+        }
         pos++;
       }
       pos++;
 
-      addSegment(segmentStart, pos - segmentStart, QuotedString);
+      addSegment(curLine, segmentStart, pos - segmentStart, QuotedString);
     }
 
     if (str->at(pos) == '<') {
@@ -510,13 +528,15 @@ namespace varco {
       pos++;
 
       while (str->at(pos) != '>') {
-        if (str->at(pos) == '\n')
+        if (str->at(pos) == '\n') {
+          incrementLineNumberIfNewline(pos);
           return; // Interrupt if a newline is found
+        }
         pos++;
       }
       pos++;
 
-      addSegment(segmentStart, pos - segmentStart, QuotedString);
+      addSegment(curLine, segmentStart, pos - segmentStart, QuotedString);
     }
   }
 
@@ -525,14 +545,16 @@ namespace varco {
 
     pos += 2; // Add the '/*' characters
 
-              // Ignore everything until a */ sequence
-    while (str->at(pos) != '*' && str->at(pos + 1) != '/')
-      pos++;
+    // Ignore everything until a */ sequence
+    while (str->at(pos) != '*' && str->at(pos + 1) != '/') {
+      incrementLineNumberIfNewline(pos);
+      ++pos;
+    }
 
     // Add '*/'
     pos += 2;
 
-    addSegment(segmentStart, pos - segmentStart, Comment);
+    addSegment(curLine, segmentStart, pos - segmentStart, Comment);
 
     return; // Return to whatever scope we were in
   }
@@ -545,6 +567,7 @@ namespace varco {
       // Skip newlines and whitespaces
       while (str->at(pos) == ' ' || str->at(pos) == '\r' || str->at(pos) == '\n') {
         // addSegment(pos, 1, Normal); // This is not needed
+        incrementLineNumberIfNewline(pos);
         pos++;
       }
 
@@ -575,8 +598,8 @@ namespace varco {
 
       declarationOrDefinition(); // Last chance: something custom
 
-                                 // TODO simple/unrecognized identifiers (and increment pos!! FGS!)
-                                 //pos++;
+      // TODO simple/unrecognized identifiers (and increment pos!! FGS!)
+      //pos++;
     }
   }
 

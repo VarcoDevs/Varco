@@ -27,9 +27,11 @@ namespace varco {
     // The contents of the document and the position we're lexing at
     std::string *str;
     size_t pos;
+    size_t curLine;
     StyleDatabase *styleDb;
 
-    void addSegment(size_t pos, size_t len, Style style);
+    void addSegment(size_t line, size_t pos, size_t len, Style style);
+    void incrementLineNumberIfNewline(size_t pos);
 
     void classDeclarationOrDefinition();
     void declarationOrDefinition();

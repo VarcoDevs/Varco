@@ -6,6 +6,11 @@
 #include <regex>
 #include <functional>
 
+// DEBUG
+#include "timerClass.h"
+#include <iostream>
+#include <fstream>
+
 namespace varco {
 
   EditorLine::EditorLine(std::string str) {
@@ -47,10 +52,10 @@ namespace varco {
     return true;
   }
 
-  void Document::setWrapWidth(int width) {
-    if (m_wrapWidth != width)
+  void Document::setWrapWidthInPixels(int width) {
+    if (m_wrapWidthPixels != width)
       m_dirty = true;
-    m_wrapWidth = width;
+    m_wrapWidthPixels = width;
   }
 
   void Document::applySyntaxHighlight(SyntaxHighlight s) {
@@ -82,6 +87,145 @@ namespace varco {
     if (!m_codeView.isControlReady())
       return; // A document can be loaded at any time
 
+
+    // Subdivide the document's lines into a suitable amount of workload per thread
+    size_t numThreads = m_codeView.m_threadPool.m_NThreads;
+    size_t minLinesPerThread = 20u;
+
+    size_t linesPerThread;
+    while (true) {
+      linesPerThread = static_cast<size_t>(
+        std::ceil(m_plainTextLines.size() / static_cast<float>(numThreads))
+        );
+      if (linesPerThread < minLinesPerThread) {
+        numThreads /= 2;
+        if (numThreads < 1)
+          numThreads = 1;
+        else if (numThreads > 1)
+          continue;
+      }
+      break;
+    }
+
+#define MAX_WRAPS_PER_LINE 10
+
+    std::vector<std::promise<std::tuple<std::vector<PhysicalLine>, SkBitmap>>> partials(numThreads);
+    auto processChunk = [&](size_t threadIdx) {
+
+      // Process a chunk of data
+      if (threadIdx >= numThreads)
+        return;
+
+      // Calculate per-thread work bounds
+      size_t start = threadIdx * linesPerThread;
+      size_t end;
+      if (numThreads == 1)
+        end = m_plainTextLines.size();
+      else
+        end = std::min(m_plainTextLines.size(), start + linesPerThread);
+
+      // Precalculate the allowed number of characters per editor line
+      int maxChars = static_cast<int>(m_wrapWidthPixels / m_codeView.getCharacterWidthPixels());
+      if (maxChars < 10)
+        maxChars = 10; // Keep it to a minimum
+
+      SkBitmap bitmap; // Allocate partial rendering result (maximum size)
+      bitmap.allocPixels(SkImageInfo::Make(m_wrapWidthPixels,
+                                           (int)((end - start) * MAX_WRAPS_PER_LINE * m_codeView.getCharacterHeightPixels()),
+                                           kN32_SkColorType, kPremul_SkAlphaType));
+      SkCanvas canvas(bitmap);
+      SkRect rect = SkRect::MakeIWH(bitmap.width(), bitmap.height()); // Drawing is performed on the bitmap - absolute rect
+
+      { // Draw partial bitmap background
+        SkPaint background;
+        background.setColor(SkColorSetARGB(255, 39, 40, 34));
+        canvas.drawRect(rect, background);
+      }
+
+      std::vector<PhysicalLine> phLineVec;
+      std::string line;
+      for (size_t i = start; i < end; ++i) {
+
+        line = m_plainTextLines[i];
+
+        std::string restOfLine;
+        std::vector<EditorLine> edLines;
+        edLines.reserve(MAX_WRAPS_PER_LINE); // Should be enough for every splitting
+
+
+        // TODO TODO
+        TODO : FIND APPROPRIATE STYLE SEGMENT WITH THE ACCELERATION STRUCTURES! (also check previous line to know first one)
+
+        // Check if the monospace'd width isn't exceeding the viewport
+        if (line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidthPixels) {
+          // We have a wrap and the line is too big - WRAP IT
+
+          edLines.clear();
+          restOfLine = line;
+
+          // Start the wrap-splitting algorithm or resort to a brute-force character splitting one if
+          // no suitable spaces could be found to split the line
+          while (restOfLine.size() > maxChars) {
+
+            int bestSplittingPointFound = -1;
+            for (int i = 0; i < restOfLine.size(); ++i) {
+              if (i > maxChars)
+                break; // We couldn't find a suitable space split point for restOfLine
+              if (restOfLine[i] == ' ' && i != 0 /* Doesn't make sense to split at 0 pos */)
+                bestSplittingPointFound = i;
+            }
+
+            if (bestSplittingPointFound != -1) { // We found a suitable space point to split this line
+              edLines.push_back(restOfLine.substr(0, bestSplittingPointFound));
+              restOfLine = restOfLine.substr(bestSplittingPointFound);
+            }
+            else {
+              // No space found, brutally split characters (last resort)
+              edLines.push_back(restOfLine.substr(0, maxChars));
+              restOfLine = restOfLine.substr(maxChars);
+            }
+          }
+          edLines.push_back(restOfLine); // Insert the last part and proceed
+
+          // No need to do anything special for tabs - they're automatically converted into spaces
+
+          std::vector<EditorLine> edVector;
+          std::copy(edLines.begin(), edLines.end(), std::back_inserter(edVector));
+          phLineVec.emplace_back(std::move(edVector));
+
+        }
+        else { // No wrap or the line fits perfectly within the wrap limits
+
+          EditorLine el(line);
+          phLineVec.emplace_back(std::move(el));
+        }
+
+      }
+
+      return;
+    };
+
+    m_codeView.m_threadPool.setCallback(processChunk);
+
+
+    m_codeView.m_threadPool.dispatch();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     m_firstDocumentRecalculate = false;
 
     if (m_needReLexing) {
@@ -98,6 +242,9 @@ namespace varco {
     m_characterWidthPixels = m_codeView.getCharacterWidthPixels();
     m_characterHeightPixels = m_codeView.getCharacterHeightPixels();
 
+    CStopWatch m_tmr;
+    m_tmr.startTimer();
+
     // Drop previous lines
     m_physicalLines.clear();
     m_numberOfEditorLines = 0;
@@ -109,15 +256,15 @@ namespace varco {
       std::string restOfLine;
       std::vector<EditorLine> edLines;
       edLines.reserve(10); // Should be enough for every splitting
-      if (m_wrapWidth != -1 && // Also check if the monospace'd width isn't exceeding the viewport
-          line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidth) {
+      if (m_wrapWidthPixels != -1 && // Also check if the monospace'd width isn't exceeding the viewport
+          line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidthPixels) {
         // We have a wrap and the line is too big - WRAP IT
 
         edLines.clear();
         restOfLine = line;
 
         // Calculate the allowed number of characters per editor line
-        int maxChars = static_cast<int>(m_wrapWidth / m_codeView.getCharacterWidthPixels());
+        int maxChars = static_cast<int>(m_wrapWidthPixels / m_codeView.getCharacterWidthPixels());
         if (maxChars < 10)
           maxChars = 10; // Keep it to a minimum
 
@@ -177,6 +324,15 @@ namespace varco {
     };
 
     m_physicalLines = std::move(blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 30U));    
+
+    m_tmr.stopTimer();
+    		double sec = m_tmr.getElapsedTimeInSeconds();
+    		double msec = sec * 1000;
+        std::ofstream f("C:\\Users\\Alex\\Desktop\\Varco\\test.txt", std::ios_base::app | std::ios_base::out);
+        f << "wrap calculations took " << msec << "\n";
+        f.close();
+        
+    		//cout << "Done in " << sec << " seconds / " << msec << " milliseconds";
   }
 
   void Document::paint() {
@@ -188,7 +344,8 @@ namespace varco {
     SkCanvas canvas(this->m_bitmap);
     SkRect rect = getRect(absoluteRect); // Drawing is performed on the bitmap - absolute rect
 
-    canvas.save();
+    CStopWatch m_tmr;
+    m_tmr.startTimer();
 
     //////////////////////////////////////////////////////////////////////
     // Draw the background of the document
@@ -343,6 +500,14 @@ namespace varco {
     }
 
     canvas.flush();
+
+    m_tmr.stopTimer();
+    double sec = m_tmr.getElapsedTimeInSeconds();
+    double msec = sec * 1000;
+    std::ofstream f("C:\\Users\\Alex\\Desktop\\Varco\\test.txt", std::ios_base::app | std::ios_base::out);
+    f << "redraw calculations took " << msec << "\n";
+    f.close();
+
   }
 
 }

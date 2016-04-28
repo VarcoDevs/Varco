@@ -31,6 +31,9 @@ namespace varco {
     PhysicalLine(EditorLine editorLine) {
       m_editorLines.emplace_back(std::move(editorLine));
     }
+    PhysicalLine(std::vector<EditorLine>&& editorLines) {
+      m_editorLines = std::forward<std::vector<EditorLine>>(editorLines);
+    }
     PhysicalLine(const PhysicalLine&) = default;
     PhysicalLine() = default;
 
@@ -51,7 +54,7 @@ namespace varco {
   private:
     friend class CodeView;
 
-    void setWrapWidth(int width);    
+    void setWrapWidthInPixels(int width);    
     void recalculateDocumentLines();
 
     void paint() override; // Renders the entire document on its bitmap
@@ -63,7 +66,7 @@ namespace varco {
     // Variables related to how the control renders lines
     SkScalar m_characterWidthPixels;
     SkScalar m_characterHeightPixels;
-    int m_wrapWidth = -1;
+    int m_wrapWidthPixels = -1;
     int m_numberOfEditorLines;
     int m_maximumCharactersLine; // According to wrapWidth   
 
