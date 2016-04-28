@@ -36,6 +36,7 @@ namespace varco {
 
     // Also update the maximum allowed to let the last line to be scrolled till the beginning of the view
     m_maximum = m_internalLineCount - 1;
+    m_value = clamp(m_value, 0.f, static_cast<SkScalar>(m_maximum));
 
     m_dirty = true; // Control needs to be redrawn and slider position to be recalculated
   }
