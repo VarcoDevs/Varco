@@ -14,7 +14,7 @@ using namespace something_else;
                             macro2
 
 
-CUSTOMTYPE function(ANOTHER_CUSTOM_TYPE parm = 22){ ATOA CUSTOMTYPE function(ANOTHER_CUSTOM_TYPE parm = 22){ ATOA CUSTOMTYPE function(ANOTHER_CUSTOM_TYPE parm = 22){ ATOA 
+CUSTOMTYPE function(ANOTHER_CUSTOM_TYPE parm = 22){
 	int lol = func();
 	int ea = 32ll;
 	void myfunc();

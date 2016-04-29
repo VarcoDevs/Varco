@@ -233,8 +233,7 @@ namespace varco {
     canvas.drawBitmapRect(m_document->getBitmap(), documentViewRect, viewportRect, nullptr);
 
     // DEBUG - DRAW ALL AND IGNORE SCROLLBAR
-    //canvas.drawBitmap(m_document->getBitmap(), 0,
-    //                  0);
+    //canvas.drawBitmap(m_document->getBitmap(), 0, 0);
     
 
     canvas.flush();

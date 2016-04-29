@@ -150,105 +150,173 @@ namespace varco {
 
       auto setColor = [&painter](Style s) {
         switch (s) {
-        case Comment: {
-          painter.setColor(SkColorSetARGB(255, 117, 113, 94)); // Gray-ish 
-        } break;
-        case Keyword: {
-          painter.setColor(SkColorSetARGB(255, 249, 38, 114)); // Pink-ish
-        } break;
-        case QuotedString: {
-          painter.setColor(SkColorSetARGB(255, 230, 219, 88)); // Yellow-ish
-        } break;
-        case Identifier: {
-          painter.setColor(SkColorSetARGB(255, 166, 226, 46)); // Green-ish
-        } break;
-        case KeywordInnerScope:
-        case FunctionCall: {
-          painter.setColor(SkColorSetARGB(255, 102, 217, 239)); // Light blue
-        } break;
-        case Literal: {
-          painter.setColor(SkColorSetARGB(255, 174, 129, 255)); // Purple-ish
-        } break;
-        default: {
-          painter.setColor(SK_ColorWHITE);
-        } break;
+          case Comment: {
+            painter.setColor(SkColorSetARGB(255, 117, 113, 94)); // Gray-ish 
+          } break;
+          case Keyword: {
+            painter.setColor(SkColorSetARGB(255, 249, 38, 114)); // Pink-ish
+          } break;
+          case QuotedString: {
+            painter.setColor(SkColorSetARGB(255, 230, 219, 88)); // Yellow-ish
+          } break;
+          case Identifier: {
+            painter.setColor(SkColorSetARGB(255, 166, 226, 46)); // Green-ish
+          } break;
+          case KeywordInnerScope:
+          case FunctionCall: {
+            painter.setColor(SkColorSetARGB(255, 102, 217, 239)); // Light blue
+          } break;
+          case Literal: {
+            painter.setColor(SkColorSetARGB(255, 174, 129, 255)); // Purple-ish
+          } break;
+          default: {
+            painter.setColor(SK_ColorWHITE);
+          } break;
         };
       };
 
-      decltype(m_styleDb.styleSegment)::iterator styleIt;
       auto styleEnd = m_styleDb.styleSegment.end();
-      decltype(m_styleDb.styleSegment)::iterator nextStyleIt;
+      auto currentStyleIt = m_styleDb.styleSegment.begin();
+      bool currentlyInSegment = false;
 
-      // Find first style for the first line to process
+      // Find first style for the first line to process (if any)
       {
         auto previousSegmentIndex = m_styleDb.previousSegment[start];
         if (previousSegmentIndex == -1) {
-          setColor(Normal); // There was no segment before this line
-          styleIt = styleEnd;
-        }
-        else {
-          setColor(m_styleDb.styleSegment[previousSegmentIndex].style);
-          styleIt = m_styleDb.styleSegment.begin() + previousSegmentIndex;
+          // There was no segment before this line, check if there's one beginning right here at character 0,
+          // otherwise it means no segment was *ever* present and we switch to normal style
+          auto firstIt = m_styleDb.styleSegment.begin();
+          if (firstIt != styleEnd && firstIt->line == start && firstIt->start == 0) {
+            // A segment begins right at the first line (pos == 0) that we have to process, get it
+            setColor(firstIt->style);
+            currentlyInSegment = true;
+            currentStyleIt = firstIt;
+          } else
+            setColor(Normal);
+        } else {
+          // There was a previous segment, that doesn't mean its style still lasts here, we have to check
+          auto previousStyle = m_styleDb.styleSegment.begin() + previousSegmentIndex;
+          if (previousStyle->absStartPos + previousStyle->count > m_styleDb.m_absOffsetWhereLineBegins[start]) {
+            // Yes, it still lasts
+            currentStyleIt = previousStyle;
+            currentlyInSegment = true;
+            setColor(previousStyle->style);
+          } else 
+            setColor(Normal);
         }
       }
 
-      auto calculateNextDestination = [](auto& styleIt, auto& nextStyleIt, auto& styleEnd) {
-        if (styleIt != styleEnd) {
-          nextStyleIt = styleIt + 1;
-        }
+      auto getFirstSegmentOnLine = [&](size_t line) {
+        auto res = m_styleDb.firstSegmentOnLine.find(line);
+        if (res == m_styleDb.firstSegmentOnLine.end())
+          return styleEnd;
         else
-          nextStyleIt = styleEnd;
+          return m_styleDb.styleSegment.begin() + res->second;
       };
 
-      // First time we don't have a destination set, just find one (if there's any)
-      calculateNextDestination(styleIt, nextStyleIt, styleEnd);
-
-      auto renderEditorLine = [&](EditorLine& el, size_t currentPhysicalLine, size_t physicalLineOffset,
-        auto& styleIt, auto& nextStyleIt, auto& styleEnd)
+      auto renderEditorLine = [&](EditorLine& el, size_t currentPhysicalLine, size_t physicalLineOffset)
       {
+        const size_t editorLineSize = el.m_characters.size();
 
-        if (el.m_characters.size() == 0) // Do not render empty lines
+        if (editorLineSize == 0) // Do not render empty lines
           return;
 
         {
           std::unique_lock<std::mutex> syncBarrier;
-          if (el.m_characters.size() > m_maximumCharactersLine) // Check if this is the longest line found ever
-            m_maximumCharactersLine = (int)el.m_characters.size();
+          if (editorLineSize > m_maximumCharactersLine) // Check if this is the longest line found ever
+            m_maximumCharactersLine = (int)editorLineSize;
         }
 
         startpoint.x = 5.f;
 
         size_t charsRendered = 0;
+        size_t absPosition = m_styleDb.m_absOffsetWhereLineBegins[currentPhysicalLine] + physicalLineOffset;
 
         do {
 
-          // If we don't have a destination OR we can't reach it within our editor line, just draw the entire line and continue
-          if (nextStyleIt == styleEnd ||
-            nextStyleIt->line > currentPhysicalLine ||
-            (nextStyleIt->line == currentPhysicalLine && nextStyleIt->start >= physicalLineOffset + el.m_characters.size())) {
+          if (charsRendered >= editorLineSize)
+            break; // We rendered everything on this line
 
-            // Just render this till the end and exit
+          //
+          // Set the current style (if any)
+          //
 
-            if (el.m_characters.size() > 0) { // Empty lines must be skipped
-              std::string ts(el.m_characters.data(), el.m_characters.size());
-              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+          if (currentStyleIt != styleEnd) {
+            if (currentStyleIt->line == currentPhysicalLine && currentStyleIt->start <= physicalLineOffset + charsRendered &&
+                currentStyleIt->start + currentStyleIt->count > physicalLineOffset + charsRendered) 
+            {
+              currentlyInSegment = true;
+              setColor(currentStyleIt->style);
+            } else
+              currentlyInSegment = false;
+            // Is there a segment which starts exactly where we are or do we stick with the previous one already set?
+            auto nextSegment = currentStyleIt + 1;
+            while (nextSegment != styleEnd && nextSegment->absStartPos == absPosition) {
+              currentStyleIt = nextSegment; // Set this as the active one
+              setColor(currentStyleIt->style);
+              currentlyInSegment = true;
+              ++nextSegment;
             }
-
-            break;
-
           }
-          else {
+          
+          //
+          // Calculate next position to reach
+          //
 
-            // We can reach the goal within this line
+          size_t nextPosToReach = 0;          
+          // Three things can happen here:
+          //  1) We have a segment and our current one ends before the end of the line OR our editor line ends before our segment ends
+          //  3) We don't have a segment and there's no one left
+          //  4) We don't have a segment and we reach either the end of the line or a new segment (whatever comes first)
 
-            std::string ts(el.m_characters.data(), static_cast<int>(nextStyleIt->start - physicalLineOffset + charsRendered));
-            canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
-            charsRendered = ts.size();
+          if (currentlyInSegment && currentStyleIt != styleEnd) { // Handles 1) and 2)
+            nextPosToReach = std::min(editorLineSize, currentStyleIt->absStartPos + currentStyleIt->count - absPosition);
+          } else { // Handles 3) and 4)
+            auto seg = getFirstSegmentOnLine(currentPhysicalLine);
+            if (seg == styleEnd)
+              nextPosToReach = editorLineSize; // No other segments ever
+            else {
+              // Try to find the next segment from this position onward on this very line
+              while (seg != styleEnd && seg->line == currentPhysicalLine && seg->start < physicalLineOffset + charsRendered)
+                ++seg;
 
-            setColor(nextStyleIt->style); // There was no segment before this line
-            styleIt = nextStyleIt;
-            calculateNextDestination(styleIt, nextStyleIt, styleEnd); // Need a new goal
+              if (seg == styleEnd || seg->line != currentPhysicalLine)
+                nextPosToReach = editorLineSize; // No other segments
+              else {
+                if (seg->start == physicalLineOffset + charsRendered) {
+                  // Segment starts right here, get it
+                  currentlyInSegment = true;
+                  currentStyleIt = seg;
+                  setColor(seg->style);
+                  continue; // We will still have to find a valid goal position..
+                } else {
+                  nextPosToReach = std::min(editorLineSize, seg->absStartPos - absPosition);
+                }
+              }
+                
+            }
+          }
 
+          //
+          // Finally draw the text
+          //
+          std::string ts(el.m_characters.data() + charsRendered, nextPosToReach - charsRendered);
+
+
+          if (ts.find("protected") != std::string::npos)
+            printf("LOL");
+
+          canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+          charsRendered += ts.size();
+          startpoint.x += m_characterWidthPixels * ts.size();
+
+          //
+          // Update the state before continuing
+          //
+          if (currentlyInSegment && nextPosToReach == currentStyleIt->start + currentStyleIt->count) {
+            ++currentStyleIt; // Segment has been exhausted
+            currentlyInSegment = false;
+            setColor(Normal);
           }
 
         } while (true);
@@ -295,11 +363,11 @@ namespace varco {
           }
           edLines.push_back(restOfLine); // Insert the last part and proceed
 
-                                         // No need to do anything special for tabs - they're automatically converted into spaces
+          // No need to do anything special for tabs - they're automatically converted into spaces
 
           size_t physicalLineOffset = 0;
           for (auto& el : edLines) {
-            renderEditorLine(el, i, physicalLineOffset, styleIt, nextStyleIt, styleEnd);
+            renderEditorLine(el, i, physicalLineOffset);
             physicalLineOffset += el.m_characters.size();
 
             // Move the rendering cursor (carriage-return)
@@ -309,12 +377,11 @@ namespace varco {
 
           phLineVec.emplace_back(std::move(edLines));
 
-        }
-        else { // No wrap or the line fits perfectly within the wrap limits
+        } else { // No wrap or the line fits perfectly within the wrap limits
 
           EditorLine el(line);
 
-          renderEditorLine(el, i, 0, styleIt, nextStyleIt, styleEnd);
+          renderEditorLine(el, i, 0);
 
           phLineVec.emplace_back(std::move(el)); // Save it
         }

@@ -132,6 +132,7 @@ namespace varco {
     curLine = 0;
     curLinePos = 0;
     styleDb->previousSegment[0] = -1;
+    styleDb->m_absOffsetWhereLineBegins[0] = 0;
 
     try {
       globalScope();
@@ -148,9 +149,9 @@ namespace varco {
 
 
   // Utility function: adds a segment to the style database
-  void CPPLexer::addSegment(size_t line, size_t pos, size_t len, Style style) {
+  void CPPLexer::addSegment(size_t line, size_t pos, size_t len, size_t absPos, Style style) {
     
-    styleDb->styleSegment.emplace_back(line, pos, len, style);
+    styleDb->styleSegment.emplace_back(line, pos, len, absPos, style);
 
     // Update acceleration structures for future style queries
     auto fIt = styleDb->firstSegmentOnLine.find(line);
@@ -169,10 +170,11 @@ namespace varco {
 
   // Utility function: increments the current line number if there's a newline at position pos
   void CPPLexer::incrementLineNumberIfNewline(size_t pos) {
-    if (str->at(pos) == '\n') {
-      ++curLine;
+    if (str->at(pos) == '\n') {      
+      ++curLine;      
       styleDb->previousSegment[curLine] = lastSegmentIndex;
       curLinePos = pos + 1;
+      styleDb->m_absOffsetWhereLineBegins[curLine] = curLinePos;
     }
   }
 
@@ -229,7 +231,7 @@ namespace varco {
       }
 
       // Assign a Keyword or Normal style and later, if we find (, make it a function declaration
-      addSegment(curLine, startSegment - curLinePos, pos - startSegment, s);
+      addSegment(curLine, startSegment - curLinePos, pos - startSegment, startSegment, s);
       foundSegment = true;
     }
     // Skip whitespaces and stuff that we're not interested in
@@ -298,7 +300,7 @@ namespace varco {
           ++pos;
         ++pos; // Include the terminal character
 
-        addSegment(curLine, startSegment - curLinePos, pos - startSegment, QuotedString);
+        addSegment(curLine, startSegment - curLinePos, pos - startSegment, startSegment, QuotedString);
       }
       else {
 
@@ -429,7 +431,7 @@ namespace varco {
   void CPPLexer::defineStatement() {
     // A define statement is a particular one: it might span one or more lines
 
-    addSegment(curLine, pos - curLinePos, 7, Keyword); // #define
+    addSegment(curLine, pos - curLinePos, 7, pos, Keyword); // #define
     pos += 7;
 
     // Skip whitespaces
@@ -450,7 +452,7 @@ namespace varco {
     while (str->at(pos) != '(' && str->at(pos) != ' ') {
       ++pos;
     }
-    addSegment(curLine, startSegment - curLinePos, pos - startSegment, Identifier);
+    addSegment(curLine, startSegment - curLinePos, pos - startSegment, startSegment, Identifier);
 
     // Regular style for all the rest. A macro, even multiline, ends when a newline not preceded
     // by \ is found
@@ -461,7 +463,7 @@ namespace varco {
       incrementLineNumberIfNewline(pos);
       ++pos;
     }
-    addSegment(firstCurLine, startSegment - firstCurLinePos, pos - startSegment, Normal);
+    addSegment(firstCurLine, startSegment - firstCurLinePos, pos - startSegment, startSegment, Normal);
     ++pos; // Eat the last character
 
     // Do not add the \n to the comment (it will be handled outside)
@@ -478,14 +480,14 @@ namespace varco {
     }
     // Do not add the \n to the comment (it will be handled outside)
 
-    addSegment(curLine, startSegment - curLinePos, pos - startSegment, Comment);
+    addSegment(curLine, startSegment - curLinePos, pos - startSegment, startSegment, Comment);
   }
 
 
   void CPPLexer::usingStatement() {
     // A statement spans until a newline is found (or EOF)
 
-    addSegment(curLine, pos - curLinePos, 5, Keyword); // using
+    addSegment(curLine, pos - curLinePos, 5, pos, Keyword); // using
     pos += 5;
 
     // Skip whitespaces
@@ -494,7 +496,7 @@ namespace varco {
     }
 
     if (str->substr(pos, 9).compare("namespace") == 0) {
-      addSegment(curLine, pos - curLinePos, 9, Keyword); // namespace
+      addSegment(curLine, pos - curLinePos, 9, pos, Keyword); // namespace
       pos += 9;
     }
 
@@ -508,13 +510,13 @@ namespace varco {
     while (str->at(pos) != '\n') {
       ++pos;
     }
-    addSegment(curLine, startSegment - curLinePos, pos - startSegment, Normal);
+    addSegment(curLine, startSegment - curLinePos, pos - startSegment, startSegment, Normal);
   }
 
   void CPPLexer::includeStatement() {
     // A statement spans until a newline is found (or EOF)
 
-    addSegment(curLine, pos - curLinePos, 8, Keyword); // #include
+    addSegment(curLine, pos - curLinePos, 8, pos, Keyword); // #include
     pos += 8;
 
     // Skip whitespaces, a quoted string is expected
@@ -535,7 +537,7 @@ namespace varco {
       }
       ++pos;
 
-      addSegment(curLine, segmentStart - curLinePos, pos - segmentStart, QuotedString);
+      addSegment(curLine, segmentStart - curLinePos, pos - segmentStart, segmentStart, QuotedString);
     }
 
     if (str->at(pos) == '<') {
@@ -551,7 +553,7 @@ namespace varco {
       }
       ++pos;
 
-      addSegment(curLine, segmentStart - curLinePos, pos - segmentStart, QuotedString);
+      addSegment(curLine, segmentStart - curLinePos, pos - segmentStart, segmentStart, QuotedString);
     }
   }
 
@@ -572,7 +574,7 @@ namespace varco {
     // Add '*/'
     pos += 2;
 
-    addSegment(firstCurLine, segmentStart - firstCurLinePos, pos - segmentStart, Comment);
+    addSegment(firstCurLine, segmentStart - firstCurLinePos, pos - segmentStart, segmentStart, Comment);
 
     return; // Return to whatever scope we were in
   }

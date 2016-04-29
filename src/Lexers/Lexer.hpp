@@ -30,15 +30,17 @@ namespace varco {
 
   struct StyleDatabase {
     struct StyleSegment {
-      StyleSegment(size_t l, size_t s, size_t c, Style st) {
+      StyleSegment(size_t l, size_t s, size_t c, size_t ap, Style st) {
         line = l;
         start = s; 
         count = c;
+        absStartPos = ap;
         style = st;
       }
       size_t line;
       size_t start;
       size_t count;
+      size_t absStartPos;
       Style style;
     };
 
@@ -48,6 +50,7 @@ namespace varco {
     std::map<size_t, size_t> firstSegmentOnLine;
     std::map<size_t, size_t> lastSegmentOnLine;
     std::map<size_t, size_t> previousSegment;
+    std::map<size_t, size_t> m_absOffsetWhereLineBegins;
   };
 
   // An abstract base class for all the Lexers to implement
