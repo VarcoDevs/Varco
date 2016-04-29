@@ -142,7 +142,7 @@ namespace varco {
 
       // Set up thread-only painter
       SkPaint painter;
-      painter.setTextSize(SkIntToScalar(14));
+      painter.setTextSize(SkIntToScalar(13));
       painter.setAntiAlias(true);
       painter.setLCDRenderText(true);
       painter.setTypeface(m_codeView.m_typeface);

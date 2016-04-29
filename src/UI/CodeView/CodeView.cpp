@@ -4,6 +4,8 @@
 #include <SkTypeface.h>
 #include <algorithm>
 
+#include <sstream> // DEBUG
+
 namespace varco {
 
 #define VSCROLLBAR_WIDTH 15
@@ -16,7 +18,7 @@ namespace varco {
 
     // Stores the width of a single character in pixels with the given font (cache this value for
     // every document to use it) and the height of a line in pixels, plus the paint used for each of them
-    m_fontPaint.setTextSize(SkIntToScalar(14));
+    m_fontPaint.setTextSize(SkIntToScalar(13));
     m_fontPaint.setAntiAlias(true);
     m_fontPaint.setLCDRenderText(true);
     m_fontPaint.setTypeface(m_typeface);
@@ -216,24 +218,31 @@ namespace varco {
     m_document->paint();
 
     // Only draw things which intersect the current viewport region
-    SkScalar verticalScrollbarWidth = 0.f;
+    /*SkScalar verticalScrollbarWidth = 0.f;
     if (m_verticalScrollBar)
-      verticalScrollbarWidth = m_verticalScrollBar->getRect(absoluteRect).width();
+      verticalScrollbarWidth = m_verticalScrollBar->getRect(absoluteRect).width();*/
 
     auto documentYoffset = m_currentYoffset * m_document->m_characterHeightPixels;
 
-    SkRect viewportRect = SkRect::MakeLTRB(getRect(absoluteRect).fLeft, getRect(absoluteRect).fTop,
-                                           getRect(absoluteRect).fRight - verticalScrollbarWidth, getRect(absoluteRect).fBottom);
+    /*SkRect viewportRect = SkRect::MakeLTRB(getRect(absoluteRect).fLeft, getRect(absoluteRect).fTop,
+                                           getRect(absoluteRect).fRight - verticalScrollbarWidth, getRect(absoluteRect).fBottom);*/
 
-    SkRect documentViewRect = SkRect::MakeLTRB(0.f, documentYoffset, std::min(viewportRect.width(), m_document->getRect(absoluteRect).width()),
-                                               std::min(documentYoffset + viewportRect.height(), m_document->getRect(absoluteRect).fBottom));
-    viewportRect.fBottom = std::min(documentViewRect.height(), viewportRect.height());
+
+    //canvas.clipRect(viewportRect, SkRegion::Op::kLastOp);
+
+
+    /*SkRect documentViewRect = SkRect::MakeLTRB(0.f, documentYoffset, std::min(viewportRect.width(), m_document->getRect(absoluteRect).width()),
+                                               std::min(documentYoffset + viewportRect.height(), m_document->getRect(absoluteRect).fBottom));*/
+    //viewportRect.fBottom = std::min(documentViewRect.height(), viewportRect.height());
+
+   
 
     // Start bitblitting from the current requested line position
-    canvas.drawBitmapRect(m_document->getBitmap(), documentViewRect, viewportRect, nullptr);
+    //canvas.drawBitmapRect(m_document->getBitmap(), documentViewRect, viewportRect, nullptr);
+    //canvas.drawBitmapRect(m_document->getBitmap(), documentViewRect, nullptr);
 
-    // DEBUG - DRAW ALL AND IGNORE SCROLLBAR
-    //canvas.drawBitmap(m_document->getBitmap(), 0, 0);
+    
+    canvas.drawBitmap(m_document->getBitmap(), 0, -documentYoffset);
     
 
     canvas.flush();
