@@ -1,0 +1,4 @@
+old: average 85.487 ms
+new: average 8.566 ms
+
+speedup ~ 10X
