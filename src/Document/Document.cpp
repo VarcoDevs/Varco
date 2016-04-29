@@ -11,6 +11,19 @@
 #include <iostream>
 #include <fstream>
 
+namespace {
+  template<typename T> // Can't move this into Utils.hpp due to MSVC ICE
+  void moveAppendVector(std::vector<T>& dst, std::vector<T>& src) {
+    if (dst.empty())
+      dst = std::move(src);
+    else {
+      dst.reserve(dst.size() + src.size());
+      std::move(std::begin(src), std::end(src), std::back_inserter(dst));
+      src.clear();
+    }
+  }
+}
+
 namespace varco {
 
   EditorLine::EditorLine(std::string str) {
@@ -81,66 +94,165 @@ namespace varco {
       recalculateDocumentLines();
   }
 
-
-  void Document::recalculateDocumentLines() {
-
-    if (!m_codeView.isControlReady())
-      return; // A document can be loaded at any time
-
-
-    // Subdivide the document's lines into a suitable amount of workload per thread
-    size_t numThreads = m_codeView.m_threadPool.m_NThreads;
-    size_t minLinesPerThread = 20u;
-
-    size_t linesPerThread;
-    while (true) {
-      linesPerThread = static_cast<size_t>(
-        std::ceil(m_plainTextLines.size() / static_cast<float>(numThreads))
-        );
-      if (linesPerThread < minLinesPerThread) {
-        numThreads /= 2;
-        if (numThreads < 1)
-          numThreads = 1;
-        else if (numThreads > 1)
-          continue;
-      }
-      break;
-    }
-
 #define MAX_WRAPS_PER_LINE 10
 
-    std::vector<std::promise<std::tuple<std::vector<PhysicalLine>, SkBitmap>>> partials(numThreads);
-    auto processChunk = [&](size_t threadIdx) {
+  void Document::threadProcessChunk(size_t threadIdx) {
 
       // Process a chunk of data
-      if (threadIdx >= numThreads)
+      if (threadIdx >= m_numThreads)
         return;
 
       // Calculate per-thread work bounds
-      size_t start = threadIdx * linesPerThread;
+      size_t start = threadIdx * m_linesPerThread;
       size_t end;
-      if (numThreads == 1)
+      if (m_numThreads == 1)
         end = m_plainTextLines.size();
       else
-        end = std::min(m_plainTextLines.size(), start + linesPerThread);
+        end = std::min(m_plainTextLines.size(), start + m_linesPerThread);
 
       // Precalculate the allowed number of characters per editor line
       int maxChars = static_cast<int>(m_wrapWidthPixels / m_codeView.getCharacterWidthPixels());
       if (maxChars < 10)
         maxChars = 10; // Keep it to a minimum
 
+      SkScalar bitmapEffectiveHeight = 0; // This is NOT know before the computation
+      SkScalar bitmapEffectiveWidth = 0;
+
+      struct {
+        float x;
+        float y;
+      } startpoint = { 5, 20 }; // Start point where to start rendering
+      bitmapEffectiveHeight += startpoint.y;
+
       SkBitmap bitmap; // Allocate partial rendering result (maximum size)
-      bitmap.allocPixels(SkImageInfo::Make(m_wrapWidthPixels,
-                                           (int)((end - start) * MAX_WRAPS_PER_LINE * m_codeView.getCharacterHeightPixels()),
-                                           kN32_SkColorType, kPremul_SkAlphaType));
+      bitmap.allocPixels(SkImageInfo::Make((int)(m_wrapWidthPixels + startpoint.x),
+        (int)((end - start) * MAX_WRAPS_PER_LINE * m_codeView.getCharacterHeightPixels()),
+        kN32_SkColorType, kPremul_SkAlphaType));
+
+      bitmapEffectiveWidth = m_wrapWidthPixels + startpoint.x;
+
       SkCanvas canvas(bitmap);
-      SkRect rect = SkRect::MakeIWH(bitmap.width(), bitmap.height()); // Drawing is performed on the bitmap - absolute rect
+      SkRect rect = SkRect::MakeIWH(bitmap.width(), bitmap.height()); // Drawing is performed on the bitmap - absolute rect      
 
       { // Draw partial bitmap background
         SkPaint background;
         background.setColor(SkColorSetARGB(255, 39, 40, 34));
         canvas.drawRect(rect, background);
       }
+
+      // Set up thread-only painter
+      SkPaint painter;
+      painter.setTextSize(SkIntToScalar(14));
+      painter.setAntiAlias(true);
+      painter.setLCDRenderText(true);
+      painter.setTypeface(m_codeView.m_typeface);
+      painter.setColor(SK_ColorWHITE);
+
+      auto setColor = [&painter](Style s) {
+        switch (s) {
+        case Comment: {
+          painter.setColor(SkColorSetARGB(255, 117, 113, 94)); // Gray-ish 
+        } break;
+        case Keyword: {
+          painter.setColor(SkColorSetARGB(255, 249, 38, 114)); // Pink-ish
+        } break;
+        case QuotedString: {
+          painter.setColor(SkColorSetARGB(255, 230, 219, 88)); // Yellow-ish
+        } break;
+        case Identifier: {
+          painter.setColor(SkColorSetARGB(255, 166, 226, 46)); // Green-ish
+        } break;
+        case KeywordInnerScope:
+        case FunctionCall: {
+          painter.setColor(SkColorSetARGB(255, 102, 217, 239)); // Light blue
+        } break;
+        case Literal: {
+          painter.setColor(SkColorSetARGB(255, 174, 129, 255)); // Purple-ish
+        } break;
+        default: {
+          painter.setColor(SK_ColorWHITE);
+        } break;
+        };
+      };
+
+      decltype(m_styleDb.styleSegment)::iterator styleIt;
+      auto styleEnd = m_styleDb.styleSegment.end();
+      decltype(m_styleDb.styleSegment)::iterator nextStyleIt;
+
+      // Find first style for the first line to process
+      {
+        auto previousSegmentIndex = m_styleDb.previousSegment[start];
+        if (previousSegmentIndex == -1) {
+          setColor(Normal); // There was no segment before this line
+          styleIt = styleEnd;
+        }
+        else {
+          setColor(m_styleDb.styleSegment[previousSegmentIndex].style);
+          styleIt = m_styleDb.styleSegment.begin() + previousSegmentIndex;
+        }
+      }
+
+      auto calculateNextDestination = [](auto& styleIt, auto& nextStyleIt, auto& styleEnd) {
+        if (styleIt != styleEnd) {
+          nextStyleIt = styleIt + 1;
+        }
+        else
+          nextStyleIt = styleEnd;
+      };
+
+      // First time we don't have a destination set, just find one (if there's any)
+      calculateNextDestination(styleIt, nextStyleIt, styleEnd);
+
+      auto renderEditorLine = [&](EditorLine& el, size_t currentPhysicalLine, size_t physicalLineOffset,
+        auto& styleIt, auto& nextStyleIt, auto& styleEnd)
+      {
+
+        if (el.m_characters.size() == 0) // Do not render empty lines
+          return;
+
+        {
+          std::unique_lock<std::mutex> syncBarrier;
+          if (el.m_characters.size() > m_maximumCharactersLine) // Check if this is the longest line found ever
+            m_maximumCharactersLine = (int)el.m_characters.size();
+        }
+
+        startpoint.x = 5.f;
+
+        size_t charsRendered = 0;
+
+        do {
+
+          // If we don't have a destination OR we can't reach it within our editor line, just draw the entire line and continue
+          if (nextStyleIt == styleEnd ||
+            nextStyleIt->line > currentPhysicalLine ||
+            (nextStyleIt->line == currentPhysicalLine && nextStyleIt->start >= physicalLineOffset + el.m_characters.size())) {
+
+            // Just render this till the end and exit
+
+            if (el.m_characters.size() > 0) { // Empty lines must be skipped
+              std::string ts(el.m_characters.data(), el.m_characters.size());
+              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+            }
+
+            break;
+
+          }
+          else {
+
+            // We can reach the goal within this line
+
+            std::string ts(el.m_characters.data(), static_cast<int>(nextStyleIt->start - physicalLineOffset + charsRendered));
+            canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+            charsRendered = ts.size();
+
+            setColor(nextStyleIt->style); // There was no segment before this line
+            styleIt = nextStyleIt;
+            calculateNextDestination(styleIt, nextStyleIt, styleEnd); // Need a new goal
+
+          }
+
+        } while (true);
+      };
 
       std::vector<PhysicalLine> phLineVec;
       std::string line;
@@ -152,11 +264,7 @@ namespace varco {
         std::vector<EditorLine> edLines;
         edLines.reserve(MAX_WRAPS_PER_LINE); // Should be enough for every splitting
 
-
-        // TODO TODO
-        TODO : FIND APPROPRIATE STYLE SEGMENT WITH THE ACCELERATION STRUCTURES! (also check previous line to know first one)
-
-        // Check if the monospace'd width isn't exceeding the viewport
+                                             // Check if the monospace'd width isn't exceeding the viewport
         if (line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidthPixels) {
           // We have a wrap and the line is too big - WRAP IT
 
@@ -187,44 +295,52 @@ namespace varco {
           }
           edLines.push_back(restOfLine); // Insert the last part and proceed
 
-          // No need to do anything special for tabs - they're automatically converted into spaces
+                                         // No need to do anything special for tabs - they're automatically converted into spaces
 
-          std::vector<EditorLine> edVector;
-          std::copy(edLines.begin(), edLines.end(), std::back_inserter(edVector));
-          phLineVec.emplace_back(std::move(edVector));
+          size_t physicalLineOffset = 0;
+          for (auto& el : edLines) {
+            renderEditorLine(el, i, physicalLineOffset, styleIt, nextStyleIt, styleEnd);
+            physicalLineOffset += el.m_characters.size();
+
+            // Move the rendering cursor (carriage-return)
+            startpoint.y += m_characterHeightPixels;
+            bitmapEffectiveHeight += m_characterHeightPixels;
+          }
+
+          phLineVec.emplace_back(std::move(edLines));
 
         }
         else { // No wrap or the line fits perfectly within the wrap limits
 
           EditorLine el(line);
-          phLineVec.emplace_back(std::move(el));
+
+          renderEditorLine(el, i, 0, styleIt, nextStyleIt, styleEnd);
+
+          phLineVec.emplace_back(std::move(el)); // Save it
         }
 
+        // Move the rendering cursor (carriage-return)
+        startpoint.y += m_characterHeightPixels;
+        bitmapEffectiveHeight += m_characterHeightPixels;
       }
 
-      return;
-    };
-
-    m_codeView.m_threadPool.setCallback(processChunk);
-
-
-    m_codeView.m_threadPool.dispatch();
-
-
-
-
-
-
+      // Time to fulfill the promise
+      {
+        std::unique_lock<std::mutex> lock(syncBarrier);
+        m_totalBitmapHeight += bitmapEffectiveHeight;
+        m_maxBitmapWidth = std::max(m_maxBitmapWidth, bitmapEffectiveWidth);
+        m_partials[threadIdx].set_value(
+          std::make_tuple<std::vector<PhysicalLine>, SkBitmap, SkScalar, SkScalar>(
+            std::move(phLineVec), std::move(bitmap), std::move(bitmapEffectiveWidth), std::move(bitmapEffectiveHeight))
+        );
+      }      
+  }
 
 
+  void Document::recalculateDocumentLines() {
 
-
-
-
-
-
-
-
+    if (!m_codeView.isControlReady())
+      return; // A document can be loaded at any time
 
     m_firstDocumentRecalculate = false;
 
@@ -242,271 +358,387 @@ namespace varco {
     m_characterWidthPixels = m_codeView.getCharacterWidthPixels();
     m_characterHeightPixels = m_codeView.getCharacterHeightPixels();
 
-    CStopWatch m_tmr;
-    m_tmr.startTimer();
 
-    // Drop previous lines
-    m_physicalLines.clear();
-    m_numberOfEditorLines = 0;
+    // Subdivide the document's lines into a suitable amount of workload per thread
+    size_t numThreads = m_codeView.m_threadPool.m_NThreads;
+    size_t minLinesPerThread = 20u;
+
+    while (true) {
+      m_linesPerThread = static_cast<size_t>(
+        std::ceil(m_plainTextLines.size() / static_cast<float>(numThreads))
+        );
+      if (m_linesPerThread < minLinesPerThread) {
+        numThreads /= 2;
+        if (numThreads < 1)
+          numThreads = 1;
+        else if (numThreads > 1)
+          continue;
+      }
+      break;
+    }
+
+    m_numThreads = numThreads;
+    m_partials.clear();
+    m_futures.clear();
+    m_partials.resize(numThreads);
+    m_futures.reserve(numThreads);
+    for (size_t i = 0; i < numThreads; ++i)
+      m_futures.emplace_back(m_partials[i].get_future());
+
+    
+    m_totalBitmapHeight = 0;
+    m_maxBitmapWidth = 0;
     m_maximumCharactersLine = 0;
 
-    std::function<std::vector<PhysicalLine>(const std::string&)> mapFn = [&, this](const std::string& line) {
-
-      std::vector<PhysicalLine> phLineVec;
-      std::string restOfLine;
-      std::vector<EditorLine> edLines;
-      edLines.reserve(10); // Should be enough for every splitting
-      if (m_wrapWidthPixels != -1 && // Also check if the monospace'd width isn't exceeding the viewport
-          line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidthPixels) {
-        // We have a wrap and the line is too big - WRAP IT
-
-        edLines.clear();
-        restOfLine = line;
-
-        // Calculate the allowed number of characters per editor line
-        int maxChars = static_cast<int>(m_wrapWidthPixels / m_codeView.getCharacterWidthPixels());
-        if (maxChars < 10)
-          maxChars = 10; // Keep it to a minimum
-
-                         // Start the wrap-splitting algorithm or resort to a brute-force character splitting one if
-                         // no suitable spaces could be found to split the line
-        while (restOfLine.size() > maxChars) {
-
-          int bestSplittingPointFound = -1;
-          for (int i = 0; i < restOfLine.size(); ++i) {
-            if (i > maxChars)
-              break; // We couldn't find a suitable space split point for restOfLine
-            if (restOfLine[i] == ' ' && i != 0 /* Doesn't make sense to split at 0 pos */)
-              bestSplittingPointFound = i;
-          }
-
-          if (bestSplittingPointFound != -1) { // We found a suitable space point to split this line
-            edLines.push_back(restOfLine.substr(0, bestSplittingPointFound));
-            restOfLine = restOfLine.substr(bestSplittingPointFound);
-          }
-          else {
-            // No space found, brutally split characters (last resort)
-            edLines.push_back(restOfLine.substr(0, maxChars));
-            restOfLine = restOfLine.substr(maxChars);
-          }
-        }
-        edLines.push_back(restOfLine); // Insert the last part and proceed
-
-        // No need to do anything special for tabs - they're automatically converted into spaces
-
-        std::vector<EditorLine> edVector;
-        std::copy(edLines.begin(), edLines.end(), std::back_inserter(edVector));
-        phLineVec.resize(1);
-        phLineVec[0].m_editorLines = std::move(edVector);
-
-      }
-      else { // No wrap or the line fits perfectly within the wrap limits
-
-        EditorLine el(line);
-        phLineVec.emplace_back(std::move(el));
-      }
-      return phLineVec;
-    };
+    m_codeView.m_threadPool.setCallback(std::bind(&Document::threadProcessChunk, this, std::placeholders::_1));
 
 
-    std::function<void(std::vector<PhysicalLine>&, const std::vector<PhysicalLine>&)> reduceFn =
-      [&, this](std::vector<PhysicalLine>& accumulator, const std::vector<PhysicalLine>& pl) {
+    m_codeView.m_threadPool.dispatch();
 
-      accumulator.insert(accumulator.end(), pl.begin(), pl.end());
+    
+    for (auto& el : m_futures) { // Wait for the threads to finish and collect futures
+      el.wait();
+    }
 
-      m_numberOfEditorLines += static_cast<int>(pl[0].m_editorLines.size()); // Some more EditorLine
-      std::for_each(pl[0].m_editorLines.begin(), pl[0].m_editorLines.end(), [this](const EditorLine& eline) {
-        int lineLength = static_cast<int>(eline.m_characters.size());
-        if (lineLength > m_maximumCharactersLine) // Check if this is the longest line found ever
-          m_maximumCharactersLine = lineLength;
-      });
+    // Resize the document bitmap to fit the new render that will take place
 
-    };
+    SkRect bitmapRect;
+    {
+      std::unique_lock<std::mutex> lock(syncBarrier);
+      bitmapRect = SkRect::MakeLTRB(0, 0, m_maxBitmapWidth, m_totalBitmapHeight);
+      this->resize(bitmapRect);
+    }
 
-    m_physicalLines = std::move(blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 30U));    
+    m_physicalLines.clear();
+    
 
-    m_tmr.stopTimer();
-    		double sec = m_tmr.getElapsedTimeInSeconds();
-    		double msec = sec * 1000;
-        std::ofstream f("C:\\Users\\Alex\\Desktop\\Varco\\test.txt", std::ios_base::app | std::ios_base::out);
-        f << "wrap calculations took " << msec << "\n";
-        f.close();
-        
-    		//cout << "Done in " << sec << " seconds / " << msec << " milliseconds";
+    SkCanvas canvas(this->m_bitmap);
+
+    // Draw background for the entire document
+    {
+      SkPaint background;
+      background.setColor(SkColorSetARGB(255, 39, 40, 34));
+      canvas.drawRect(bitmapRect, background);
+    }
+
+    
+    
+    SkScalar yOffset = 0;
+    m_numberOfEditorLines = 0;
+    for (auto& fut : m_futures) {
+
+      auto data = std::move(fut.get());
+      SkBitmap partialBitmap = std::move(std::get<1>(data));
+
+      m_numberOfEditorLines += (int)std::get<0>(data).size();
+      
+      moveAppendVector<PhysicalLine>(m_physicalLines, std::get<0>(data));
+      
+      // Calculate source and destination rect
+      SkRect partialRect = SkRect::MakeLTRB(0, 0, std::get<2>(data), std::get<3>(data));
+      SkRect documentDestRect = SkRect::MakeLTRB(0, yOffset,
+        std::get<2>(data), (yOffset + std::get<3>(data)));
+
+      canvas.drawBitmapRect(partialBitmap, partialRect, documentDestRect, nullptr, SkCanvas::SrcRectConstraint::kStrict_SrcRectConstraint);
+      yOffset += (size_t)std::get<3>(data);
+    }
+
+ 
+
+    m_dirty = false;
+
+
+   
+
+
+
+
+
+
+    //m_firstDocumentRecalculate = false;
+
+    //if (m_needReLexing) {
+    //  std::string m_plainText;
+    //  for (auto& line : m_plainTextLines) { // Expensive, hopefully this doesn't happen too often - LEX DIRECTLY FROM VECTOR
+    //    m_plainText.append(line);
+    //    m_plainText += '\n';
+    //  }
+    //  m_lexer->lexInput(std::move(m_plainText), m_styleDb);
+    //  m_needReLexing = false;
+    //}
+
+    //// Load parameters from codeview parent
+    //m_characterWidthPixels = m_codeView.getCharacterWidthPixels();
+    //m_characterHeightPixels = m_codeView.getCharacterHeightPixels();
+
+    //CStopWatch m_tmr;
+    //m_tmr.startTimer();
+
+    //// Drop previous lines
+    //m_physicalLines.clear();
+    //m_numberOfEditorLines = 0;
+    //m_maximumCharactersLine = 0;
+
+    //std::function<std::vector<PhysicalLine>(const std::string&)> mapFn = [&, this](const std::string& line) {
+
+    //  std::vector<PhysicalLine> phLineVec;
+    //  std::string restOfLine;
+    //  std::vector<EditorLine> edLines;
+    //  edLines.reserve(10); // Should be enough for every splitting
+    //  if (m_wrapWidthPixels != -1 && // Also check if the monospace'd width isn't exceeding the viewport
+    //      line.size() * m_codeView.getCharacterWidthPixels() > m_wrapWidthPixels) {
+    //    // We have a wrap and the line is too big - WRAP IT
+
+    //    edLines.clear();
+    //    restOfLine = line;
+
+    //    // Calculate the allowed number of characters per editor line
+    //    int maxChars = static_cast<int>(m_wrapWidthPixels / m_codeView.getCharacterWidthPixels());
+    //    if (maxChars < 10)
+    //      maxChars = 10; // Keep it to a minimum
+
+    //                     // Start the wrap-splitting algorithm or resort to a brute-force character splitting one if
+    //                     // no suitable spaces could be found to split the line
+    //    while (restOfLine.size() > maxChars) {
+
+    //      int bestSplittingPointFound = -1;
+    //      for (int i = 0; i < restOfLine.size(); ++i) {
+    //        if (i > maxChars)
+    //          break; // We couldn't find a suitable space split point for restOfLine
+    //        if (restOfLine[i] == ' ' && i != 0 /* Doesn't make sense to split at 0 pos */)
+    //          bestSplittingPointFound = i;
+    //      }
+
+    //      if (bestSplittingPointFound != -1) { // We found a suitable space point to split this line
+    //        edLines.push_back(restOfLine.substr(0, bestSplittingPointFound));
+    //        restOfLine = restOfLine.substr(bestSplittingPointFound);
+    //      }
+    //      else {
+    //        // No space found, brutally split characters (last resort)
+    //        edLines.push_back(restOfLine.substr(0, maxChars));
+    //        restOfLine = restOfLine.substr(maxChars);
+    //      }
+    //    }
+    //    edLines.push_back(restOfLine); // Insert the last part and proceed
+
+    //    // No need to do anything special for tabs - they're automatically converted into spaces
+
+    //    std::vector<EditorLine> edVector;
+    //    std::copy(edLines.begin(), edLines.end(), std::back_inserter(edVector));
+    //    phLineVec.resize(1);
+    //    phLineVec[0].m_editorLines = std::move(edVector);
+
+    //  }
+    //  else { // No wrap or the line fits perfectly within the wrap limits
+
+    //    EditorLine el(line);
+    //    phLineVec.emplace_back(std::move(el));
+    //  }
+    //  return phLineVec;
+    //};
+
+
+    //std::function<void(std::vector<PhysicalLine>&, const std::vector<PhysicalLine>&)> reduceFn =
+    //  [&, this](std::vector<PhysicalLine>& accumulator, const std::vector<PhysicalLine>& pl) {
+
+    //  accumulator.insert(accumulator.end(), pl.begin(), pl.end());
+
+    //  m_numberOfEditorLines += static_cast<int>(pl[0].m_editorLines.size()); // Some more EditorLine
+    //  std::for_each(pl[0].m_editorLines.begin(), pl[0].m_editorLines.end(), [this](const EditorLine& eline) {
+    //    int lineLength = static_cast<int>(eline.m_characters.size());
+    //    if (lineLength > m_maximumCharactersLine) // Check if this is the longest line found ever
+    //      m_maximumCharactersLine = lineLength;
+    //  });
+
+    //};
+
+    //m_physicalLines = std::move(blockingOrderedMapReduce<std::vector<PhysicalLine>>(m_plainTextLines, mapFn, reduceFn, 30U));    
+
+    //m_tmr.stopTimer();
+    //		double sec = m_tmr.getElapsedTimeInSeconds();
+    //		double msec = sec * 1000;
+    //    std::ofstream f("C:\\Users\\Alex\\Desktop\\Varco\\test.txt", std::ios_base::app | std::ios_base::out);
+    //    f << "wrap calculations took " << msec << "\n";
+    //    f.close();
+    //    
+    //		//cout << "Done in " << sec << " seconds / " << msec << " milliseconds";
   }
 
   void Document::paint() {
     if (!m_dirty)
       return;
 
-    m_dirty = false; // It will be false at the end of this function, unless overridden
 
-    SkCanvas canvas(this->m_bitmap);
-    SkRect rect = getRect(absoluteRect); // Drawing is performed on the bitmap - absolute rect
+    recalculateDocumentLines();
 
-    CStopWatch m_tmr;
-    m_tmr.startTimer();
+    //m_dirty = false; // It will be false at the end of this function, unless overridden
 
-    //////////////////////////////////////////////////////////////////////
-    // Draw the background of the document
-    //////////////////////////////////////////////////////////////////////
-    {
-      SkPaint background;
-      background.setColor(SkColorSetARGB(255, 39, 40, 34));
-      canvas.drawRect(rect, background);
-    }    
+    //SkCanvas canvas(this->m_bitmap);
+    //SkRect rect = getRect(absoluteRect); // Drawing is performed on the bitmap - absolute rect
 
-    //////////////////////////////////////////////////////////////////////
-    // Draw the entire document with a classic monokai style
-    //////////////////////////////////////////////////////////////////////
-    SkPaint& painter = m_codeView.m_fontPaint;
-    painter.setColor(SK_ColorWHITE);
+    //CStopWatch m_tmr;
+    //m_tmr.startTimer();
 
-    auto setColor = [&painter](Style s) {
-      switch (s) {
-        case Comment: {
-          painter.setColor(SkColorSetARGB(255, 117, 113, 94)); // Gray-ish 
-        } break;
-        case Keyword: {
-          painter.setColor(SkColorSetARGB(255, 249, 38, 114)); // Pink-ish
-        } break;
-        case QuotedString: {
-          painter.setColor(SkColorSetARGB(255, 230, 219, 88)); // Yellow-ish
-        } break;
-        case Identifier: {
-          painter.setColor(SkColorSetARGB(255, 166, 226, 46)); // Green-ish
-        } break;
-        case KeywordInnerScope:
-        case FunctionCall: {
-          painter.setColor(SkColorSetARGB(255, 102, 217, 239)); // Light blue
-        } break;
-        case Literal: {
-          painter.setColor(SkColorSetARGB(255, 174, 129, 255)); // Purple-ish
-        } break;
-        default: {
-          painter.setColor(SK_ColorWHITE);
-        } break;
-      };
-    };
+    ////////////////////////////////////////////////////////////////////////
+    //// Draw the background of the document
+    ////////////////////////////////////////////////////////////////////////
+    //{
+    //  SkPaint background;
+    //  background.setColor(SkColorSetARGB(255, 39, 40, 34));
+    //  canvas.drawRect(rect, background);
+    //}    
 
-    size_t documentRelativePos = 0;
-    size_t lineRelativePos = 0;
+    ////////////////////////////////////////////////////////////////////////
+    //// Draw the entire document with a classic monokai style
+    ////////////////////////////////////////////////////////////////////////
+    //SkPaint& painter = m_codeView.m_fontPaint;
+    //painter.setColor(SK_ColorWHITE);
 
-    struct {
-      float x;
-      float y;
-    } startpoint = { 5, 20 }; // Start point where to start rendering
+    //auto setColor = [&painter](Style s) {
+    //  switch (s) {
+    //    case Comment: {
+    //      painter.setColor(SkColorSetARGB(255, 117, 113, 94)); // Gray-ish 
+    //    } break;
+    //    case Keyword: {
+    //      painter.setColor(SkColorSetARGB(255, 249, 38, 114)); // Pink-ish
+    //    } break;
+    //    case QuotedString: {
+    //      painter.setColor(SkColorSetARGB(255, 230, 219, 88)); // Yellow-ish
+    //    } break;
+    //    case Identifier: {
+    //      painter.setColor(SkColorSetARGB(255, 166, 226, 46)); // Green-ish
+    //    } break;
+    //    case KeywordInnerScope:
+    //    case FunctionCall: {
+    //      painter.setColor(SkColorSetARGB(255, 102, 217, 239)); // Light blue
+    //    } break;
+    //    case Literal: {
+    //      painter.setColor(SkColorSetARGB(255, 174, 129, 255)); // Purple-ish
+    //    } break;
+    //    default: {
+    //      painter.setColor(SK_ColorWHITE);
+    //    } break;
+    //  };
+    //};
 
-    auto styleIt = m_styleDb.styleSegment.begin();
-    auto styleEnd = m_styleDb.styleSegment.end();
-    size_t nextDestination = -1;
+    //size_t documentRelativePos = 0;
+    //size_t lineRelativePos = 0;
 
-    auto calculateNextDestination = [&]() {
-      // We can have 2 cases here:
-      // 1) Our position hasn't still reached a style segment (apply regular style and continue)
-      // 2) Our position is exactly on the start of a style segment (apply segment style and continue)
-      // If there are no other segments, use a regular style and continue till the end of the lines
+    //struct {
+    //  float x;
+    //  float y;
+    //} startpoint = { 5, 20 }; // Start point where to start rendering
 
-      if (styleIt == styleEnd) { // No other segments
-        nextDestination = -1;
-        setColor(Normal);
-        return;
-      }
+    //auto styleIt = m_styleDb.styleSegment.begin();
+    //auto styleEnd = m_styleDb.styleSegment.end();
+    //size_t nextDestination = -1;
 
-      if (styleIt->start > documentRelativePos) { // Case 1
-        setColor(Normal);
-        nextDestination = styleIt->start;
-      }
-      else if (styleIt->start == documentRelativePos) { // Case 2
-        setColor(styleIt->style);
-        nextDestination = styleIt->start + styleIt->count;
-        ++styleIt; // This makes sure our document relative position is never ahead of a style segment
-      }
-    };
+    //auto calculateNextDestination = [&]() {
+    //  // We can have 2 cases here:
+    //  // 1) Our position hasn't still reached a style segment (apply regular style and continue)
+    //  // 2) Our position is exactly on the start of a style segment (apply segment style and continue)
+    //  // If there are no other segments, use a regular style and continue till the end of the lines
 
-    // First time we don't have a destination set, just find one (if there's any)
-    calculateNextDestination();
+    //  if (styleIt == styleEnd) { // No other segments
+    //    nextDestination = -1;
+    //    setColor(Normal);
+    //    return;
+    //  }
 
-    for (auto& pl : m_physicalLines) {
+    //  if (styleIt->start > documentRelativePos) { // Case 1
+    //    setColor(Normal);
+    //    nextDestination = styleIt->start;
+    //  }
+    //  else if (styleIt->start == documentRelativePos) { // Case 2
+    //    setColor(styleIt->style);
+    //    nextDestination = styleIt->start + styleIt->count;
+    //    ++styleIt; // This makes sure our document relative position is never ahead of a style segment
+    //  }
+    //};
 
-      size_t editorLineIndex = 0; // This helps tracking the last EditorLine of a PhysicalLine
-      for (auto& el : pl.m_editorLines) {
-        ++editorLineIndex;
+    //// First time we don't have a destination set, just find one (if there's any)
+    //calculateNextDestination();
 
-        do {
-          startpoint.x = 5.f + lineRelativePos * m_characterWidthPixels;
+    //for (auto& pl : m_physicalLines) {
 
-          // If we don't have a destination OR we can't reach it within our line, just draw the entire line and continue
-          if (nextDestination == -1 ||
-            nextDestination > documentRelativePos + (el.m_characters.size() - lineRelativePos)) {
+    //  size_t editorLineIndex = 0; // This helps tracking the last EditorLine of a PhysicalLine
+    //  for (auto& el : pl.m_editorLines) {
+    //    ++editorLineIndex;
 
-            // Multiple lines will have to be rendered, just render this till the end and continue
+    //    do {
+    //      startpoint.x = 5.f + lineRelativePos * m_characterWidthPixels;
 
-            size_t charsRendered = 0;
-            if (el.m_characters.size() > 0) { // Empty lines must be skipped
-              std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
-              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
-              charsRendered = ts.size();
-            }
+    //      // If we don't have a destination OR we can't reach it within our line, just draw the entire line and continue
+    //      if (nextDestination == -1 ||
+    //        nextDestination > documentRelativePos + (el.m_characters.size() - lineRelativePos)) {
 
-            lineRelativePos = 0; // Next editor line will just start from the beginning
-            documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
-              (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
+    //        // Multiple lines will have to be rendered, just render this till the end and continue
 
-            break; // Go and fetch a new line for the next cycle
-          }
-          else {
+    //        size_t charsRendered = 0;
+    //        if (el.m_characters.size() > 0) { // Empty lines must be skipped
+    //          std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
+    //          canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+    //          charsRendered = ts.size();
+    //        }
 
-            // We can reach the goal within this line
+    //        lineRelativePos = 0; // Next editor line will just start from the beginning
+    //        documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
+    //          (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
 
-            size_t charsRendered = 0;
-            if (el.m_characters.size() > 0) { // Empty lines must be skipped
-              std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(nextDestination - documentRelativePos));
-              canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
-              charsRendered = ts.size();
-            }
+    //        break; // Go and fetch a new line for the next cycle
+    //      }
+    //      else {
 
-            bool goFetchNewLine = false; // If this goal also exhausted the current editor line, go fetch
-                                         // another one
-            bool addNewLine = false; // If this was the last editor line, also add a newline because it
-                                     // corresponds to a new physical line starting
-            if (nextDestination - documentRelativePos + lineRelativePos == el.m_characters.size()) {
-              goFetchNewLine = true;
+    //        // We can reach the goal within this line
 
-              // Do not allow EditorLine to insert a '\n'. They're virtual lines
-              if (editorLineIndex == pl.m_editorLines.size())
-                addNewLine = true;
+    //        size_t charsRendered = 0;
+    //        if (el.m_characters.size() > 0) { // Empty lines must be skipped
+    //          std::string ts(el.m_characters.data() + lineRelativePos, static_cast<int>(nextDestination - documentRelativePos));
+    //          canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+    //          charsRendered = ts.size();
+    //        }
 
-              lineRelativePos = 0; // Next editor line will just start from the beginning
-            }
-            else
-              lineRelativePos += charsRendered;
+    //        bool goFetchNewLine = false; // If this goal also exhausted the current editor line, go fetch
+    //                                     // another one
+    //        bool addNewLine = false; // If this was the last editor line, also add a newline because it
+    //                                 // corresponds to a new physical line starting
+    //        if (nextDestination - documentRelativePos + lineRelativePos == el.m_characters.size()) {
+    //          goFetchNewLine = true;
 
-            documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's
-                                                                         // end AND a physical line ended, not an EditorLine
+    //          // Do not allow EditorLine to insert a '\n'. They're virtual lines
+    //          if (editorLineIndex == pl.m_editorLines.size())
+    //            addNewLine = true;
 
-            calculateNextDestination(); // Need a new goal
+    //          lineRelativePos = 0; // Next editor line will just start from the beginning
+    //        }
+    //        else
+    //          lineRelativePos += charsRendered;
 
-            if (goFetchNewLine)
-              break; // Go fetch a new editor line (possibly on another physical line),
-                     // we exhausted this editor line
-          }
+    //        documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's
+    //                                                                     // end AND a physical line ended, not an EditorLine
 
-        } while (true);
+    //        calculateNextDestination(); // Need a new goal
 
-        // Move the rendering cursor (carriage-return)
-        startpoint.y = startpoint.y + m_characterHeightPixels;
-      }
-    }
+    //        if (goFetchNewLine)
+    //          break; // Go fetch a new editor line (possibly on another physical line),
+    //                 // we exhausted this editor line
+    //      }
 
-    canvas.flush();
+    //    } while (true);
 
-    m_tmr.stopTimer();
-    double sec = m_tmr.getElapsedTimeInSeconds();
-    double msec = sec * 1000;
-    std::ofstream f("C:\\Users\\Alex\\Desktop\\Varco\\test.txt", std::ios_base::app | std::ios_base::out);
-    f << "redraw calculations took " << msec << "\n";
-    f.close();
+    //    // Move the rendering cursor (carriage-return)
+    //    startpoint.y = startpoint.y + m_characterHeightPixels;
+    //  }
+    //}
+
+    //canvas.flush();
+
+    //m_tmr.stopTimer();
+    //double sec = m_tmr.getElapsedTimeInSeconds();
+    //double msec = sec * 1000;
+    //std::ofstream f("C:\\Users\\Alex\\Desktop\\Varco\\test.txt", std::ios_base::app | std::ios_base::out);
+    //f << "redraw calculations took " << msec << "\n";
+    //f.close();
 
   }
 

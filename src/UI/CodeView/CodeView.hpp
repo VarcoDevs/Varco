@@ -15,6 +15,7 @@ namespace varco {
   class CodeView : public UIElement<ui_container_tag, ui_control_tag> { // The main code edit control
   public:
     CodeView(UIElement<ui_container_tag>& parentContainer);
+    ~CodeView();
 
     void resize(SkRect rect) override;
     void paint() override;
@@ -52,7 +53,7 @@ namespace varco {
 
     SkScalar m_currentYoffset = 0; // Y offset percentage in the current document
 
-    ThreadPool<15> m_threadPool;
+    ThreadPool m_threadPool;
   };
 
 }

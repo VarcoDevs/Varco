@@ -9,7 +9,7 @@ namespace varco {
 #define VSCROLLBAR_WIDTH 15
 
   CodeView::CodeView(UIElement<ui_container_tag>& parentContainer)
-    : UIElement(parentContainer)
+    : UIElement(parentContainer), m_threadPool(15)
   {
     // Create a monospace typeface
     m_typeface = SkTypeface::CreateFromName("Consolas", SkTypeface::kNormal); // Or closest match
@@ -39,6 +39,8 @@ namespace varco {
     m_verticalScrollBar->setLineHeightPixels(m_characterHeightPixels);
   }
 
+  CodeView::~CodeView() {}
+
   void CodeView::resize(SkRect rect) {
     UIElement::resize(rect);
 
@@ -59,9 +61,9 @@ namespace varco {
       m_document->recalculateDocumentLines();
 
       // Resize the document bitmap to fit the new render that will take place
-      SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInPixels * getCharacterWidthPixels() + 5.f,
-                                        m_document->m_numberOfEditorLines * getCharacterHeightPixels() + 20.f);
-      m_document->resize(newRect);
+      //SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInPixels * getCharacterWidthPixels() + 5.f,
+      //                                  m_document->m_numberOfEditorLines * getCharacterHeightPixels() + 20.f);
+      //m_document->resize(newRect);
 
       // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
       m_verticalScrollBar->documentSizeChanged(m_document->m_maximumCharactersLine, 
@@ -229,8 +231,10 @@ namespace varco {
 
     // Start bitblitting from the current requested line position
     canvas.drawBitmapRect(m_document->getBitmap(), documentViewRect, viewportRect, nullptr);
-    //canvas.drawBitmap(m_document->getBitmap(), m_document->getRect(absoluteRect).fLeft,
-    //                  m_verticalScrollBar->getRect(absoluteRect).fTop + documentYoffset);
+
+    // DEBUG - DRAW ALL AND IGNORE SCROLLBAR
+    //canvas.drawBitmap(m_document->getBitmap(), 0,
+    //                  0);
     
 
     canvas.flush();

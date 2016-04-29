@@ -130,6 +130,8 @@ namespace varco {
     styleDb = &sdb;
     pos = 0;
     curLine = 0;
+    curLinePos = 0;
+    styleDb->previousSegment[0] = -1;
 
     try {
       globalScope();
@@ -147,22 +149,31 @@ namespace varco {
 
   // Utility function: adds a segment to the style database
   void CPPLexer::addSegment(size_t line, size_t pos, size_t len, Style style) {
+    
     styleDb->styleSegment.emplace_back(line, pos, len, style);
+
     // Update acceleration structures for future style queries
     auto fIt = styleDb->firstSegmentOnLine.find(line);
     auto lIt = styleDb->lastSegmentOnLine.find(line);
+
     if (fIt == styleDb->firstSegmentOnLine.end()) {
       styleDb->firstSegmentOnLine[line] = styleDb->styleSegment.size() - 1;
       styleDb->lastSegmentOnLine[line] = styleDb->styleSegment.size() - 1;
     }
+
     if (fIt != styleDb->firstSegmentOnLine.end())
       styleDb->lastSegmentOnLine[line] = styleDb->styleSegment.size() - 1;
+
+    lastSegmentIndex = styleDb->styleSegment.size() - 1;
   }
 
   // Utility function: increments the current line number if there's a newline at position pos
   void CPPLexer::incrementLineNumberIfNewline(size_t pos) {
-    if (str->at(pos) == '\n')
+    if (str->at(pos) == '\n') {
       ++curLine;
+      styleDb->previousSegment[curLine] = lastSegmentIndex;
+      curLinePos = pos + 1;
+    }
   }
 
   void CPPLexer::classDeclarationOrDefinition() {
@@ -174,17 +185,17 @@ namespace varco {
 
     // Skip whitespaces
     while (str->at(pos) == ' ') {
-      pos++;
+      ++pos;
     }
 
     // Handle any keyword or identifier until a terminator character
     bool foundSegment = false;
     size_t startSegment = pos;
     while ((str->at(pos) >= '0' && str->at(pos) <= '9')
-      || (str->at(pos) >= 'A' && str->at(pos) <= 'Z')
-      || (str->at(pos) >= 'a' && str->at(pos) <= 'z')
-      || str->at(pos) == '_') {
-      pos++;
+        || (str->at(pos) >= 'A' && str->at(pos) <= 'Z')
+        || (str->at(pos) >= 'a' && str->at(pos) <= 'z')
+        || str->at(pos) == '_') {
+      ++pos;
     }
     if (pos > startSegment) { // We found something
       Style s = Normal;
@@ -218,12 +229,13 @@ namespace varco {
       }
 
       // Assign a Keyword or Normal style and later, if we find (, make it a function declaration
-      addSegment(startSegment, pos - startSegment, s);
+      addSegment(curLine, startSegment - curLinePos, pos - startSegment, s);
       foundSegment = true;
     }
     // Skip whitespaces and stuff that we're not interested in
     while (str->at(pos) == ' ' || str->at(pos) == '\n') {
-      pos++;
+      incrementLineNumberIfNewline(pos);
+      ++pos;
     }
 
     if (str->at(pos) == '(') {
@@ -252,7 +264,7 @@ namespace varco {
         m_adaptPreviousSegments.clear();
       }
 
-      pos++; // Eat the '('
+      ++pos; // Eat the '('
     }
 
     if (str->at(pos) == ':' && str->at(pos + 1) == ':') { // :: makes the previous segment part of the new one
@@ -262,7 +274,7 @@ namespace varco {
 
     if (foundSegment == false) { // We couldn't find a normal identifier
       if (str->at(pos) == '{') { // Handle entering/exiting scopes
-        pos++;
+        ++pos;
         m_scopesStack.push(static_cast<int>(m_scopesStack.size()));
 
         if (m_classKeywordActiveOnScope == -1)
@@ -270,7 +282,7 @@ namespace varco {
 
       }
       else if (str->at(pos) == '}') {
-        pos++;
+        ++pos;
 
         if (m_classKeywordActiveOnScope == m_scopesStack.top())
           m_classKeywordActiveOnScope = -2; // Exited a class scope
@@ -284,9 +296,9 @@ namespace varco {
         startSegment = pos++;
         while (str->at(pos) != startCharacter)
           ++pos;
-        pos++; // Include the terminal character
+        ++pos; // Include the terminal character
 
-        addSegment(startSegment, pos - startSegment, QuotedString);
+        addSegment(curLine, startSegment - curLinePos, pos - startSegment, QuotedString);
       }
       else {
 
@@ -295,7 +307,7 @@ namespace varco {
         if (str->at(pos) == ';' && m_classKeywordActiveOnScope == -1)
           m_classKeywordActiveOnScope = -2; // Deactivate the class scope override
 
-        pos++;
+        ++pos;
       }
     }
 
@@ -417,12 +429,12 @@ namespace varco {
   void CPPLexer::defineStatement() {
     // A define statement is a particular one: it might span one or more lines
 
-    addSegment(pos, 7, Keyword); // #define
+    addSegment(curLine, pos - curLinePos, 7, Keyword); // #define
     pos += 7;
 
     // Skip whitespaces
     while (str->at(pos) == ' ') {
-      pos++;
+      ++pos;
     }
 
     // Now we might have something like
@@ -431,25 +443,28 @@ namespace varco {
     // #define MYMACRO(a,b,c..) something
     // or even
     // #define MYMACRO XX \
-      //                 multiline
-  //
+    //                 multiline
+    //
 
     size_t startSegment = pos;
     while (str->at(pos) != '(' && str->at(pos) != ' ') {
-      pos++;
+      ++pos;
     }
-    addSegment(startSegment, pos - startSegment, Identifier);
+    addSegment(curLine, startSegment - curLinePos, pos - startSegment, Identifier);
 
     // Regular style for all the rest. A macro, even multiline, ends when a newline not preceded
     // by \ is found
     startSegment = pos;
+    size_t firstCurLine = curLine;
+    size_t firstCurLinePos = curLinePos;
     while (!(str->at(pos) != '\\' && str->at(pos + 1) == '\n')) {
-      pos++;
+      incrementLineNumberIfNewline(pos);
+      ++pos;
     }
-    addSegment(startSegment, pos - startSegment, Normal);
-    pos++; // Eat the last character
+    addSegment(firstCurLine, startSegment - firstCurLinePos, pos - startSegment, Normal);
+    ++pos; // Eat the last character
 
-           // Do not add the \n to the comment (it will be handled outside)
+    // Do not add the \n to the comment (it will be handled outside)
   }
 
   void CPPLexer::lineCommentStatement() {
@@ -459,89 +474,92 @@ namespace varco {
 
     // Skip everything until \n
     while (str->at(pos) != '\n') {
-      pos++;
+      ++pos;
     }
     // Do not add the \n to the comment (it will be handled outside)
 
-    addSegment(curLine, startSegment, pos - startSegment, Comment);
+    addSegment(curLine, startSegment - curLinePos, pos - startSegment, Comment);
   }
 
 
   void CPPLexer::usingStatement() {
     // A statement spans until a newline is found (or EOF)
 
-    addSegment(pos, 5, Keyword); // using
+    addSegment(curLine, pos - curLinePos, 5, Keyword); // using
     pos += 5;
 
     // Skip whitespaces
     while (str->at(pos) == ' ') {
-      pos++;
+      ++pos;
     }
 
     if (str->substr(pos, 9).compare("namespace") == 0) {
-      addSegment(pos, 9, Keyword); // namespace
+      addSegment(curLine, pos - curLinePos, 9, Keyword); // namespace
       pos += 9;
     }
 
     // Skip whitespaces
     while (str->at(pos) == ' ') {
-      pos++;
+      ++pos;
     }
 
     // Whatever identifier we've found until \n
     size_t startSegment = pos;
     while (str->at(pos) != '\n') {
-      pos++;
+      ++pos;
     }
-    addSegment(startSegment, pos - startSegment, Normal);
+    addSegment(curLine, startSegment - curLinePos, pos - startSegment, Normal);
   }
 
   void CPPLexer::includeStatement() {
     // A statement spans until a newline is found (or EOF)
 
-    addSegment(curLine, pos, 8, Keyword); // #include
+    addSegment(curLine, pos - curLinePos, 8, Keyword); // #include
     pos += 8;
 
     // Skip whitespaces, a quoted string is expected
     while (str->at(pos) == ' ') {
-      pos++;
+      ++pos;
     }
 
     if (str->at(pos) == '"') {
       size_t segmentStart = pos;
-      pos++;
+      ++pos;
 
       while (str->at(pos) != '"') {
         if (str->at(pos) == '\n') {
           incrementLineNumberIfNewline(pos);
           return; // Interrupt if a newline is found
         }
-        pos++;
+        ++pos;
       }
-      pos++;
+      ++pos;
 
-      addSegment(curLine, segmentStart, pos - segmentStart, QuotedString);
+      addSegment(curLine, segmentStart - curLinePos, pos - segmentStart, QuotedString);
     }
 
     if (str->at(pos) == '<') {
       size_t segmentStart = pos;
-      pos++;
+      ++pos;
 
       while (str->at(pos) != '>') {
         if (str->at(pos) == '\n') {
           incrementLineNumberIfNewline(pos);
           return; // Interrupt if a newline is found
         }
-        pos++;
+        ++pos;
       }
-      pos++;
+      ++pos;
 
-      addSegment(curLine, segmentStart, pos - segmentStart, QuotedString);
+      addSegment(curLine, segmentStart - curLinePos, pos - segmentStart, QuotedString);
     }
   }
 
   void CPPLexer::multilineComment() {
     size_t segmentStart = pos;
+
+    size_t firstCurLine = curLine;
+    size_t firstCurLinePos = curLinePos;
 
     pos += 2; // Add the '/*' characters
 
@@ -554,7 +572,7 @@ namespace varco {
     // Add '*/'
     pos += 2;
 
-    addSegment(curLine, segmentStart, pos - segmentStart, Comment);
+    addSegment(firstCurLine, segmentStart - firstCurLinePos, pos - segmentStart, Comment);
 
     return; // Return to whatever scope we were in
   }
@@ -566,9 +584,9 @@ namespace varco {
 
       // Skip newlines and whitespaces
       while (str->at(pos) == ' ' || str->at(pos) == '\r' || str->at(pos) == '\n') {
-        // addSegment(pos, 1, Normal); // This is not needed
+        // addSegment(curLine, pos- curLinePos, 1, Normal); // This is not needed
         incrementLineNumberIfNewline(pos);
-        pos++;
+        ++pos;
       }
 
       if (str->at(pos) == '/' && str->at(pos + 1) == '*') { // Multiline C-style string
@@ -599,7 +617,7 @@ namespace varco {
       declarationOrDefinition(); // Last chance: something custom
 
       // TODO simple/unrecognized identifiers (and increment pos!! FGS!)
-      //pos++;
+      //++pos;
     }
   }
 

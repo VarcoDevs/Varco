@@ -30,7 +30,12 @@ namespace varco {
 
   struct StyleDatabase {
     struct StyleSegment {
-      StyleSegment(size_t l, size_t s, size_t c, Style st) : line(l), start(s), count(c), style(st) {}
+      StyleSegment(size_t l, size_t s, size_t c, Style st) {
+        line = l;
+        start = s; 
+        count = c;
+        style = st;
+      }
       size_t line;
       size_t start;
       size_t count;
@@ -42,6 +47,7 @@ namespace varco {
     // Fast-rendering acceleration structures: store the first (if any) segment on a line and the last (if any)
     std::map<size_t, size_t> firstSegmentOnLine;
     std::map<size_t, size_t> lastSegmentOnLine;
+    std::map<size_t, size_t> previousSegment;
   };
 
   // An abstract base class for all the Lexers to implement

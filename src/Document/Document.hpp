@@ -5,6 +5,7 @@
 #include <Lexers/Lexer.hpp>
 #include <vector>
 #include <string>
+#include <future>
 
 namespace varco {
 
@@ -74,6 +75,17 @@ namespace varco {
     bool m_needReLexing = false;
     bool m_firstDocumentRecalculate = true;
     StyleDatabase m_styleDb;
+
+    void threadProcessChunk(size_t threadIdx);
+    std::mutex syncBarrier;
+    size_t m_numThreads = 1;
+    size_t m_linesPerThread;
+    SkScalar m_totalBitmapHeight = 0;
+    SkScalar m_maxBitmapWidth = 0;
+    std::vector<std::promise<std::tuple<std::vector<PhysicalLine>, SkBitmap,
+      SkScalar /* effective width */, SkScalar /* effective height */>>> m_partials;
+    std::vector<std::future<std::tuple<std::vector<PhysicalLine>, SkBitmap, 
+      SkScalar, SkScalar>>> m_futures;
   };
 
 }

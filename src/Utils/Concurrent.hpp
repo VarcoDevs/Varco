@@ -167,15 +167,16 @@ namespace varco {
   }
 
 
-  template<size_t N_Threads>
   class ThreadPool {
   public:
-    ThreadPool() {
-      for(auto i = 0; i < N_Threads; ++i)
+    ThreadPool(size_t N_Threads) : m_NThreads(N_Threads) {
+      m_workloadReady.resize(m_NThreads, false);
+      for(auto i = 0; i < m_NThreads; ++i)
         m_threads.emplace_back(&ThreadPool::threadMain, this, i);
     }
     ~ThreadPool() {
       m_sigterm = true;
+      m_cv.notify_all();
       for (auto& thread : m_threads) {
         if (thread.joinable())
           thread.join();
@@ -185,18 +186,19 @@ namespace varco {
       m_callback = callback;
     }
     void dispatch() {
-      m_workloadReady = true;
+      std::fill(m_workloadReady.begin(), m_workloadReady.end(), true);
+      m_workloadReady.resize(m_NThreads, true);
       m_cv.notify_all();
     }
 
-    static constexpr const size_t m_NThreads = N_Threads;
+    const size_t m_NThreads;
 
   private:
     void threadMain(size_t threadIdx) {
       while (!m_sigterm) {
         {
           std::unique_lock<std::mutex> lock(m_mutex);
-          while (!m_sigterm && !m_workloadReady) {
+          while (!m_sigterm && !m_workloadReady[threadIdx]) {
             m_cv.wait(lock);
           }
         }
@@ -204,12 +206,17 @@ namespace varco {
           return;
 
         m_callback(threadIdx);
+
+        {
+          std::unique_lock<std::mutex> lock(m_mutex);
+          m_workloadReady[threadIdx] = false;
+        }
       }
     }
 
     std::vector<std::thread> m_threads;
     bool m_sigterm = false;
-    bool m_workloadReady = false;
+    std::vector<bool> m_workloadReady;
     std::mutex m_mutex;
     std::condition_variable m_cv;
     std::function<void(size_t)> m_callback;
