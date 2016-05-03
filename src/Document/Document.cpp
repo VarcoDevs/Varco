@@ -405,6 +405,9 @@ namespace varco {
     if (!m_codeView.isControlReady())
       return; // A document can be loaded at any time
 
+    if (m_wrapWidthPixels <= 0)
+      return; // Nonsense wrapping
+
     m_firstDocumentRecalculate = false;
 
     if (m_needReLexing) {
