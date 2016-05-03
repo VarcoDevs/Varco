@@ -643,11 +643,13 @@ printf("I have redrawn the damn thing %d\n", lol++);
           y = evt->xmotion.y;
         }
 
-        if (evt->xmotion.state & Button1Mask) { // Left mouse is down
-          x = evt->xmotion.x;
-          y = evt->xmotion.y;
+        x = evt->xmotion.x;
+        y = evt->xmotion.y;
+
+        if (evt->xmotion.state & Button1Mask) // Left mouse is down
           this->onLeftMouseMove(x, y);
-        }
+
+        this->onMouseMove(x, y);
       } break;
 
       default: // fallthrough
@@ -691,6 +693,10 @@ printf("I have redrawn the damn thing %d\n", lol++);
 
   void BaseOSWindow::startMouseCapture() { // Track the mouse to be notified when it leaves the client area
     // Do nothing, linux tracks mouse exit if LeaveWindowMask is used
+  }
+
+  void BaseOSWindow::stopMouseCapture() {
+    // Ditto
   }
 
   void BaseOSWindow::repaint() {

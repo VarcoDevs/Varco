@@ -7,9 +7,9 @@
 #include <functional>
 
 // DEBUG
-#include "timerClass.h"
-#include <iostream>
-#include <fstream>
+// #include "timerClass.h"
+// #include <iostream>
+// #include <fstream>
 
 namespace {
   template<typename T> // Can't move this into Utils.hpp due to MSVC ICE
@@ -301,10 +301,6 @@ namespace varco {
           // Finally draw the text
           //
           std::string ts(el.m_characters.data() + charsRendered, nextPosToReach - charsRendered);
-
-
-          if (ts.find("protected") != std::string::npos)
-            printf("LOL");
 
           canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
           charsRendered += ts.size();
