@@ -43,8 +43,9 @@ namespace varco {
     Document *m_document = nullptr;
     std::unique_ptr<ScrollBar> m_verticalScrollBar;
 
-    SkTypeface *m_typeface = nullptr; // Font used throughout the control
+    sk_sp<SkTypeface> m_typeface; // Font used throughout the control
     SkPaint m_fontPaint; // Paint data for the font
+    int m_textSize = 15;
 
     SkScalar m_characterWidthPixels, m_characterHeightPixels;
     int m_wrapWidthInPixels = 0;

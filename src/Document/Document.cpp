@@ -2,6 +2,7 @@
 #include <UI/CodeView/CodeView.hpp>
 #include <Utils/Concurrent.hpp>
 #include <SkCanvas.h>
+#include <SkTypeface.h>
 #include <fstream>
 #include <regex>
 #include <functional>
@@ -142,7 +143,7 @@ namespace varco {
 
       // Set up thread-only painter
       SkPaint painter;
-      painter.setTextSize(SkIntToScalar(13));
+      painter.setTextSize(SkIntToScalar(m_codeView.m_textSize));
       painter.setAntiAlias(true);
       painter.setLCDRenderText(true);
       painter.setTypeface(m_codeView.m_typeface);

@@ -312,9 +312,7 @@ namespace varco {
     GrBackendRenderTargetDesc desc;
     desc.fWidth = SkScalarRoundToInt(width);
     desc.fHeight = SkScalarRoundToInt(heigth);
-    desc.fConfig = fContext->caps()->srgbSupport() &&
-                   (Bitmap.info().profileType() == kSRGB_SkColorProfileType ||
-                    Bitmap.info().colorType() == kRGBA_F16_SkColorType)
+    desc.fConfig = fContext->caps()->srgbSupport() && Bitmap.info().colorType() == kRGBA_F16_SkColorType
         ? kSkiaGamma8888_GrPixelConfig
         : kSkia8888_GrPixelConfig;
     desc.fOrigin = kBottomLeft_GrSurfaceOrigin;

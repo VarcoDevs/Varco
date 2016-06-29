@@ -20,34 +20,8 @@ set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DSK_DEBUG")
 # No gpu log calls in debug
 set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGR_GL_LOG_CALLS=0 -DGR_GL_CHECK_ERROR=0")
 
-# 7zip is used to decompress during configure the necessary dependencies
-set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
-# Decompress binaries if needed
-if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skia.lib)
-  message (STATUS "Decompressing Win64 Skia binaries...")
-
-  # Important: dependencies MUST be available
-  if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia.7z)
-    message (FATAL_ERROR "[ERROR] 'deps/skia.7z' unavailable - please download it from https://github.com/VarcoDevs/Varco/releases")
-  endif()
-
-
-  # 7zip is preferable, but as a fallback use cmake built-in 7zip module
-  find_package (SevenZip)
-  if (NOT SEVENZIP_FOUND)
-    message (STATUS "[FALLBACK] CMake will be used to decompress dependencies")
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_SOURCE_DIR}/deps/skia.7z
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps # Folder where to decompress stuff
-    )
-  else() # Use 7Zip
-    execute_process(
-        COMMAND ${SEVENZIP_BINARY} x ${CMAKE_SOURCE_DIR}/deps/skia.7z
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/deps # Folder where to decompress stuff
-    )
-  endif()
-endif()
+set (BUILD_SHARED_LIBS FALSE) # This causes skia to be built as a static lib
+add_subdirectory (deps/skia/cmake)
 
 list (APPEND INCLUDES 
                         deps/skia/include/android
@@ -59,6 +33,7 @@ list (APPEND INCLUDES
                         deps/skia/include/device
                         deps/skia/include/effects
                         deps/skia/include/gpu
+                        deps/skia/src/gpu
                         deps/skia/include/images
                         deps/skia/include/pathops
                         deps/skia/include/pipe
@@ -75,31 +50,14 @@ if (WIN32)
           src/WindowHandling/BaseOSWindow_Win.hpp
           src/WindowHandling/MainWindow.cpp
           src/WindowHandling/MainWindow.hpp)
-  list (APPEND LIBS
-          optimized;${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skia.lib;
-          debug;${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skiad.lib;)
-
-  if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skia.lib)
-    message (FATAL_ERROR "[ERROR] Could not decompress dependencies - either install 7zip or unpack them manually")
-  endif()
-  # Copy debug information for skia into the debug build directory
-  message(STATUS "Copying debug information to build directory.." )
-  file(COPY ${CMAKE_SOURCE_DIR}/deps/skia/libs/win64/skiad.pdb DESTINATION ${CMAKE_BINARY_DIR}/Debug)
-  file(RENAME ${CMAKE_BINARY_DIR}/Debug/skiad.pdb ${CMAKE_BINARY_DIR}/Debug/skia.pdb)
 endif()
+
 if (UNIX)
   set (WINDOWHANDLING_SRCS
           src/WindowHandling/BaseOSWindow_Linux.cpp
           src/WindowHandling/BaseOSWindow_Linux.hpp
           src/WindowHandling/MainWindow.cpp
           src/WindowHandling/MainWindow.hpp)
-  list (APPEND LIBS
-          optimized;${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libskia.a;
-          debug;${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libskiad.a;)
-
-  if (NOT EXISTS ${CMAKE_SOURCE_DIR}/deps/skia/libs/linux/libskia.a)
-    message (FATAL_ERROR "[ERROR] Could not decompress dependencies - either install 7zip or unpack them manually")
-  endif()
 endif()
 ########################################## End Skia dependency ##########################################
 
@@ -152,7 +110,7 @@ list (APPEND INCLUDES ${CMAKE_BINARY_DIR}/Configuration)
 
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})
-target_link_libraries (varco ${LIBS})
+target_link_libraries (varco skia)
 if (UNIX)
   #X11 specifies a different default order for RGBA samples (BGRA)
   target_compile_definitions(varco PRIVATE -DSK_SAMPLES_FOR_X)
@@ -172,12 +130,12 @@ if (UNIX) # Additional unix libraries required
   set_target_properties (varco PROPERTIES COMPILE_FLAGS -pthread LINK_FLAGS -pthread)
   
   #FontConfig
-  find_package (Fontconfig REQUIRED)
-	if(NOT FONTCONFIG_FOUND)
-	  message (ERROR "Required FontConfig package not found")	
-	else()
-	  target_link_libraries (varco ${FONTCONFIG_LIBRARIES})
-	endif()	
+  #find_package (Fontconfig REQUIRED)
+  #if(NOT FONTCONFIG_FOUND)
+  #  message (ERROR "Required FontConfig package not found")	
+  #else()
+  #  target_link_libraries (varco ${FONTCONFIG_LIBRARIES})
+  #endif()	
 	
 	#Freetype
   find_package (Freetype REQUIRED)

@@ -14,11 +14,22 @@ namespace varco {
     : UIElement(parentContainer), m_threadPool(15)
   {
     // Create a monospace typeface
-    m_typeface = SkTypeface::CreateFromName("Consolas", SkTypeface::kNormal); // Or closest match
+
+    const char *fontFamily =
+#ifdef _WIN32
+        "Consolas";
+#elif defined __linux__
+        "Ubuntu Mono";
+#endif
+    // An alternative approach here is to ship a standard font for every/each platform
+    // e.g. SkTypeface::MakeFromFile("/home/alex/Desktop/UbuntuMono-R.ttf");
+    m_typeface = SkTypeface::MakeFromName(fontFamily, SkFontStyle{SkFontStyle::Weight::kNormal_Weight,
+                                                                  SkFontStyle::Width::kNormal_Width,
+                                                                  SkFontStyle::Slant::kUpright_Slant}); // Or closest match
 
     // Stores the width of a single character in pixels with the given font (cache this value for
     // every document to use it) and the height of a line in pixels, plus the paint used for each of them
-    m_fontPaint.setTextSize(SkIntToScalar(13));
+    m_fontPaint.setTextSize(SkIntToScalar(m_textSize));
     m_fontPaint.setAntiAlias(true);
     m_fontPaint.setLCDRenderText(true);
     m_fontPaint.setTypeface(m_typeface);

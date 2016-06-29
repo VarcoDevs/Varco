@@ -128,7 +128,10 @@ namespace varco {
     tabBorderPaint.setColor(SkColorSetARGB(255, 70, 70, 70));
     canvas.drawPath(path, tabBorderPaint); // Stroke
 
-    SkTypeface *arialTypeface = SkTypeface::CreateFromName("Arial", SkTypeface::kNormal); // Or closest match
+    sk_sp<SkTypeface> arialTypeface = SkTypeface::MakeFromName("Arial",
+                                                               SkFontStyle{SkFontStyle::Weight::kNormal_Weight,
+                                                               SkFontStyle::Width::kNormal_Width,
+                                                               SkFontStyle::Slant::kUpright_Slant}); // Or closest match
     SkPaint tabTextPaint;
     tabTextPaint.setColor(SK_ColorWHITE);
     tabTextPaint.setAlpha(255);
