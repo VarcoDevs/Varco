@@ -1,0 +1,3 @@
+[submodule "deps/skia"]
+	path = deps/skia
+	url = https://github.com/VarcoDevs/skia
