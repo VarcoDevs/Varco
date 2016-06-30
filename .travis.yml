@@ -9,36 +9,13 @@ sudo: false
 branches:
   except: /pr\/.*/
 
-env:
-  # Workaround for https://github.com/travis-ci/travis-ci/issues/4681
-  varco:
-    - TRAVIS_EMPTY_JOB_WORKAROUND=true
-
-
-addons:
-  apt:
-    packages:
-      - valgrind
-      - g++-6
-    sources: &sources
-      - ubuntu-toolchain-r-test
-
 cache:
   directories:
     - ${TRAVIS_BUILD_DIR}/deps/llvm-3.6.2
     - ${TRAVIS_BUILD_DIR}/deps/llvm-3.7.1
     - ${TRAVIS_BUILD_DIR}/deps/llvm-3.8.0
 
-
-cache:
-  directories:
-    - ${TRAVIS_BUILD_DIR}/deps/llvm-3.6.2
-    - ${TRAVIS_BUILD_DIR}/deps/llvm-3.7.1
-    - ${TRAVIS_BUILD_DIR}/deps/llvm-3.8.0
-
-varco:
-  exclude:
-    - env: TRAVIS_EMPTY_JOB_WORKAROUND=true
+matrix:
 
   include:
 
@@ -120,8 +97,8 @@ install:
 # Override travis standard build process (we don't need configure & tests)
 ############################################################################
 script:
-  - ls
-  - make all -j4
+  - cd build
+  - make -j4
 
 before_script:
 
