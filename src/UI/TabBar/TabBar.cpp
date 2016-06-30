@@ -335,7 +335,7 @@ namespace varco {
     auto slideOffset = tabsCurrentRect.width() - tabOverlapSize;
     size_t unselectedTab = (selectedTabIndex == tab1 ? tab2 : tab1);
     // Swapped with a right unselected
-    if (selectedTabIndex == tab1 && tab1 < tab2 || selectedTabIndex == tab2 && tab2 < tab1) {
+    if ((selectedTabIndex == tab1 && tab1 < tab2) || (selectedTabIndex == tab2 && tab2 < tab1)) {
 
       m_startXTrackingPosition += slideOffset;
       tabs[selectedTabIndex].trackingOffset -= slideOffset;

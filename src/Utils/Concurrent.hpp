@@ -2,6 +2,7 @@
 #define VARCO_CONCURRENT_HPP
 
 #include <algorithm>
+#include <cmath>
 #include <thread>
 #include <type_traits>
 #include <tuple>

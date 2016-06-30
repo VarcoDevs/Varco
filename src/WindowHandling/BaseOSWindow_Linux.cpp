@@ -659,7 +659,7 @@ namespace varco {
             // Strip URI identifiers and end whitespaces
             {
               std::string& str = filenames.back();
-              size_t i = str.size() - 1;
+              int i = str.size() - 1;
               for(; i >= 0; --i) {
                   if (std::isspace(str[i]) == 0)
                     break;
@@ -786,6 +786,8 @@ namespace varco {
     }
 
     renderThread.detach();
+
+    return 0;
   }
 
   void BaseOSWindow::startMouseCapture() { // Track the mouse to be notified when it leaves the client area
