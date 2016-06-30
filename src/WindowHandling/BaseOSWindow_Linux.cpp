@@ -737,10 +737,7 @@ namespace varco {
 
         int x, y;
 
-        while (XCheckTypedWindowEvent(fDisplay, fWin, MotionNotify, evt)) {
-          x = evt->xmotion.x;
-          y = evt->xmotion.y;
-        }
+        while (XCheckTypedWindowEvent(fDisplay, fWin, MotionNotify, evt)) {}
 
         x = evt->xmotion.x;
         y = evt->xmotion.y;
@@ -768,7 +765,7 @@ namespace varco {
     renderThread = std::thread(renderProc);
 
     bool exitRequested = false;
-    while(1) {
+    while(true) {
 
       XEvent evt;
       XNextEvent(fDisplay, &evt);

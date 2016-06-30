@@ -39,6 +39,7 @@ namespace varco {
     bool isTrackingActive() const;
 
   private:
+    friend class CodeView;
     UIElement<ui_container_tag, ui_control_tag>& m_parentControlContainer;
 
     Slider m_slider;

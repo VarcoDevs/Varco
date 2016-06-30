@@ -32,7 +32,7 @@ namespace varco {
     }
 
     bool extensionEndsIn(const std::string& fileName, const std::string& ext) {
-      if (fileName.size() + 1 < ext.size())
+      if (fileName.empty() || fileName.find('.') == std::string::npos || fileName.size() < ext.size() + 1)
         return false;
       return fileName.compare(fileName.size() - ext.size() - 1, ext.size() + 1, "." + ext) == 0;
     }
@@ -52,6 +52,16 @@ namespace varco {
   }
 
   void DocumentManager::changeSelectedDocument(int id) {
-    m_codeEditCtrl.loadDocument(*m_tabDocumentMap[id]); // The document MUST be present
+    // Save current vertical scrollbar position
+    m_tabDocumentVScrollPos[m_tabCtrl.tabs[m_tabCtrl.selectedTabIndex].uniqueId] =
+        m_codeEditCtrl.getVScrollbarValue();
+
+    // Restore (if any) vertical scrollbar position
+    auto it = m_tabDocumentVScrollPos.find(id);
+    SkScalar vScrollbarPos = 0;
+    if (it != m_tabDocumentVScrollPos.end())
+      vScrollbarPos = it->second;
+    // And load the document
+    m_codeEditCtrl.loadDocument(*m_tabDocumentMap[id], vScrollbarPos); // The document MUST be present
   }
 }

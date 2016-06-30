@@ -92,7 +92,7 @@ namespace varco {
       tabBorderPaint.setShader(shader);
     }
     SkRect tabRect = SkRect::MakeLTRB(0, 5 /* top padding */, this->parent->tabsCurrentRect.width(), this->parent->tabsCurrentRect.fBottom);
-    SkScalar yDistanceBetweenBezierPoints = (tabRect.fBottom - tabRect.fTop) / 4.0f;
+    // SkScalar yDistanceBetweenBezierPoints = (tabRect.fBottom - tabRect.fTop) / 4.0f;
 
     path.reset();
     //    _ P2

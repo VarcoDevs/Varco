@@ -11,7 +11,7 @@ namespace varco {
       return true;
     else
       return false;
-  };
+  }
 
   template<typename T>
   constexpr const T& clamp(const T& val, const T& lo, const T& hi) {

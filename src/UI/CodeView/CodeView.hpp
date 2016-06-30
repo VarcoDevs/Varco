@@ -12,6 +12,8 @@ class SkTypeface;
 
 namespace varco {
 
+  class DocumentManager;
+
   class CodeView : public UIElement<ui_container_tag, ui_control_tag> { // The main code edit control
   public:
     CodeView(UIElement<ui_container_tag>& parentContainer);
@@ -24,7 +26,7 @@ namespace varco {
     void startMouseCapture() override;
     void stopMouseCapture() override;
 
-    void loadDocument(Document& doc);
+    void loadDocument(Document& doc, SkScalar vScrollbarPos = 0);
     SkScalar getCharacterWidthPixels() const;
     SkScalar getCharacterHeightPixels() const;
     bool isControlReady() const;
@@ -39,10 +41,18 @@ namespace varco {
     void setViewportYOffset(SkScalar value);
 
   private:
-    friend class Document;
+    friend class DocumentManager;
+    friend class Document;    
 
     Document *m_document = nullptr;
     std::unique_ptr<ScrollBar> m_verticalScrollBar;
+
+    inline void setVScrollbarValue(SkScalar value) {
+      m_verticalScrollBar->m_value = value;
+    }
+    inline SkScalar getVScrollbarValue() {
+      return m_verticalScrollBar->m_value;
+    }
 
     sk_sp<SkTypeface> m_typeface; // Font used throughout the control
     SkPaint m_fontPaint; // Paint data for the font

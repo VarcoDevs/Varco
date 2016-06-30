@@ -172,7 +172,7 @@ namespace varco {
   public:
     ThreadPool(size_t N_Threads) : m_NThreads(N_Threads) {
       m_workloadReady.resize(m_NThreads, false);
-      for(auto i = 0; i < m_NThreads; ++i)
+      for(size_t i = 0; i < m_NThreads; ++i)
         m_threads.emplace_back(&ThreadPool::threadMain, this, i);
     }
     ~ThreadPool() {

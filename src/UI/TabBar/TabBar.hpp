@@ -43,14 +43,15 @@ namespace varco {
     struct private_access {};
 
   public:
-    Tab(TabBar *parent, std::string title, const private_access&) : // Only accessible to friend classes
-      Tab(parent, title)
+    Tab (TabBar *parent, std::string title, const private_access&) : // Only accessible to friend classes
+      Tab (parent, title)
     {}
   private:
 
     friend class TabBar;
+    friend class DocumentManager;
   
-    Tab(TabBar *parent, std::string title);
+    Tab (TabBar *parent, std::string title);
 
     // Paint the tab into its own bitmap
     void paint();
@@ -65,7 +66,7 @@ namespace varco {
 
     TabBar *parent;
     std::string title;
-    int uniqueId;
+    int uniqueId; // Important - document and tab unique Id
     SkBitmap bitmap; // The tab will be rendered here
     bool dirty = true;
     SkPath path; // The path where clicks and inputs are accepted
