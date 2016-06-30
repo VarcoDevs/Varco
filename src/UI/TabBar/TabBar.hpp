@@ -12,7 +12,8 @@
 
 namespace varco {
 
-  class TabBar;  
+  class TabBar;
+  class DocumentManager;
 
   class Tab { // Represents a tab inside the tab control
   private:
@@ -78,6 +79,7 @@ namespace varco {
 
   class TabBar : public UIElement<ui_control_tag> { // The main tab control
     friend class Tab;
+    friend class DocumentManager;
     // Initialization values for all the tabs in this control
     const SkScalar TAB_MAX_WIDTH = 150.0;
     const SkScalar TAB_MIN_WIDTH = 50.0;
@@ -116,6 +118,8 @@ namespace varco {
     void recalculateTabsRects(); // Recalculates all the tabs rects (e.g. shrinks them in case the window got smaller)
     // Return true if the control needs redrawing
     bool getAndDecreaseMovementOffsetForTab(int tab, SkScalar& movement);
+
+    std::function<bool(int)> signalDocumentChange; // Callback for document handlers. Returns true if the change is allowed
   };
 }
 

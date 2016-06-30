@@ -12,6 +12,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <memory>
+#include <string>
 
 class GrContext;
 struct GrGLInterface;
@@ -34,6 +35,7 @@ namespace varco {
     virtual void onLeftMouseDown(SkScalar x, SkScalar y) = 0;
     virtual void onLeftMouseMove(SkScalar x, SkScalar y) = 0;
     virtual void onMouseWheel(SkScalar x, SkScalar y, int direction) = 0;
+    virtual void onFileDrop(SkScalar x, SkScalar y, std::string file) = 0;
     void startMouseCapture();
     void stopMouseCapture();
     virtual void onMouseLeave() = 0;

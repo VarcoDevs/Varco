@@ -215,7 +215,7 @@ namespace varco {
       return true; // Also needs a redraw
     }
     return false;
-  }  
+  }
 
   void TabBar::paint() {
 
@@ -382,14 +382,18 @@ namespace varco {
         if (tab.getMovementOffset() != 0)
           return; // No dragging when returning to home position
 
-        if (selectedTabIndex != i) { // Left click on the already selected tab won't trigger a "selected check"          
-          redrawNeeded = true;
+        if (selectedTabIndex != i) { // Left click on the already selected tab won't trigger a "selected check"
 
-          if (selectedTabIndex != -1) // Deselect old selected tab
-            tabs[selectedTabIndex].setSelected(false);
+          // Signal that there has been a change of selection in the tabs bar
+          if (!signalDocumentChange || signalDocumentChange(tab.uniqueId) == true) {
+            redrawNeeded = true;
 
-          selectedTabIndex = i;
-          tab.setSelected(true);
+            if (selectedTabIndex != -1) // Deselect old selected tab
+              tabs[selectedTabIndex].setSelected(false);
+
+            selectedTabIndex = i; // Do NOT confuse this (tabs bar index) with the uniqueId of the tab/document
+            tab.setSelected(true);
+          }          
         }
         
         m_tracking = true;

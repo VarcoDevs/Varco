@@ -24,55 +24,61 @@ set (BUILD_SHARED_LIBS FALSE) # This causes skia to be built as a static lib
 add_subdirectory (deps/skia/cmake)
 
 list (APPEND INCLUDES 
-                        deps/skia/include/android
-                        deps/skia/include/animator
-                        deps/skia/include/c
-                        deps/skia/include/codec
-                        deps/skia/include/config
-                        deps/skia/include/core
-                        deps/skia/include/device
-                        deps/skia/include/effects
-                        deps/skia/include/gpu
-                        deps/skia/src/gpu
-                        deps/skia/include/images
-                        deps/skia/include/pathops
-                        deps/skia/include/pipe
-                        deps/skia/include/ports
-                        deps/skia/include/private
-                        deps/skia/include/svg
-                        deps/skia/include/utils
-                        deps/skia/include/views
-                        deps/skia/include/xml)
+            deps/skia/include/android
+            deps/skia/include/animator
+            deps/skia/include/c
+            deps/skia/include/codec
+            deps/skia/include/config
+            deps/skia/include/core
+            deps/skia/include/device
+            deps/skia/include/effects
+            deps/skia/include/gpu
+            deps/skia/src/gpu
+            deps/skia/include/images
+            deps/skia/include/pathops
+            deps/skia/include/pipe
+            deps/skia/include/ports
+            deps/skia/include/private
+            deps/skia/include/svg
+            deps/skia/include/utils
+            deps/skia/include/views
+            deps/skia/include/xml)
 
 if (WIN32)
   set (WINDOWHANDLING_SRCS 
-          src/WindowHandling/BaseOSWindow_Win.cpp
-          src/WindowHandling/BaseOSWindow_Win.hpp
-          src/WindowHandling/MainWindow.cpp
-          src/WindowHandling/MainWindow.hpp)
+            src/WindowHandling/BaseOSWindow_Win.cpp
+            src/WindowHandling/BaseOSWindow_Win.hpp
+            src/WindowHandling/MainWindow.cpp
+            src/WindowHandling/MainWindow.hpp)
 endif()
 
 if (UNIX)
   set (WINDOWHANDLING_SRCS
-          src/WindowHandling/BaseOSWindow_Linux.cpp
-          src/WindowHandling/BaseOSWindow_Linux.hpp
-          src/WindowHandling/MainWindow.cpp
-          src/WindowHandling/MainWindow.hpp)
+            src/WindowHandling/BaseOSWindow_Linux.cpp
+            src/WindowHandling/BaseOSWindow_Linux.hpp
+            src/WindowHandling/MainWindow.cpp
+            src/WindowHandling/MainWindow.hpp)
 endif()
 ########################################## End Skia dependency ##########################################
 
 list (APPEND SRCS ${WINDOWHANDLING_SRCS})
 source_group (WindowHandling FILES ${WINDOWHANDLING_SRCS})
 
+set (CONTROL_SRCS
+            src/Control/DocumentManager.cpp
+            src/Control/DocumentManager.hpp)
+list (APPEND SRCS ${CONTROL_SRCS})
+source_group (Control FILES ${CONTROL_SRCS})
+
 set (UI_SRCS
-			    src/UI/UIElement.cpp
-			    src/UI/UIElement.hpp
-          src/UI/TabBar/TabBar.cpp
-          src/UI/TabBar/TabBar.hpp
-          src/UI/ScrollBar/ScrollBar.cpp
-          src/UI/ScrollBar/ScrollBar.hpp
-          src/UI/CodeView/CodeView.cpp
-          src/UI/CodeView/CodeView.hpp)
+            src/UI/UIElement.cpp
+            src/UI/UIElement.hpp
+            src/UI/TabBar/TabBar.cpp
+            src/UI/TabBar/TabBar.hpp
+            src/UI/ScrollBar/ScrollBar.cpp
+            src/UI/ScrollBar/ScrollBar.hpp
+            src/UI/CodeView/CodeView.cpp
+            src/UI/CodeView/CodeView.hpp)
 list (APPEND SRCS ${UI_SRCS})
 source_group (UI FILES ${UI_SRCS})
 
@@ -108,9 +114,11 @@ set (TESTDATA_BASICBLOCKFILE "${CMAKE_SOURCE_DIR}/TestData/BasicBlock.cpp")
 configure_file (${CMAKE_SOURCE_DIR}/TestData/config_template.hpp ${CMAKE_BINARY_DIR}/Configuration/config.hpp)
 list (APPEND INCLUDES ${CMAKE_BINARY_DIR}/Configuration)
 
+# Main Varco project definition and its dependency projects
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})
 target_link_libraries (varco skia)
+
 if (UNIX)
   #X11 specifies a different default order for RGBA samples (BGRA)
   target_compile_definitions(varco PRIVATE -DSK_SAMPLES_FOR_X)
@@ -119,7 +127,7 @@ endif()
 if (UNIX) # Additional unix libraries required
 
   #X11
-	find_package ( X11 REQUIRED )
+  find_package ( X11 REQUIRED )
   if (NOT X11_FOUND)
     message (ERROR "Required X11 package not found")
   else()
@@ -128,16 +136,8 @@ if (UNIX) # Additional unix libraries required
   endif()
   
   set_target_properties (varco PROPERTIES COMPILE_FLAGS -pthread LINK_FLAGS -pthread)
-  
-  #FontConfig
-  #find_package (Fontconfig REQUIRED)
-  #if(NOT FONTCONFIG_FOUND)
-  #  message (ERROR "Required FontConfig package not found")	
-  #else()
-  #  target_link_libraries (varco ${FONTCONFIG_LIBRARIES})
-  #endif()	
 	
-	#Freetype
+  #Freetype
   find_package (Freetype REQUIRED)
 	if(NOT FREETYPE_FOUND)
 	  message (ERROR "Required Freetype package not found")

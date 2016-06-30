@@ -46,7 +46,8 @@ namespace varco {
 
     // Stores the beginning and count of characters per each styled segment
     std::vector<StyleSegment> styleSegment;
-    // Fast-rendering acceleration structures: store the first (if any) segment on a line and the last (if any)
+    // Fast-rendering acceleration structures: store the first (if any) segment on a line and the last (if any).
+    // Store the previous segment index for a line (if any), and the absolute offset where a line begins
     std::map<size_t, size_t> firstSegmentOnLine;
     std::map<size_t, size_t> lastSegmentOnLine;
     std::map<size_t, size_t> previousSegment;

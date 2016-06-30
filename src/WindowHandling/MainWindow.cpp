@@ -2,8 +2,6 @@
 #include <SkCanvas.h>
 #include <Utils/Utils.hpp>
 
-#include <config.hpp>
-
 namespace varco {
 
 #ifdef _WIN32
@@ -14,19 +12,9 @@ namespace varco {
     : BaseOSWindow(argc, argv),
 #endif
       m_tabCtrl(*this),
-      m_codeEditCtrl(*this)
-  {
-    // DEBUG - Add some debug tabs
-    int id = m_tabCtrl.addNewTab("BasicBlock.cpp");
-    auto it = m_tabDocumentMap.emplace(id, std::make_unique<Document>(m_codeEditCtrl));
-    Document *document = it.first->second.get();
-    document->loadFromFile(TestData::SimpleFile);
-    document->applySyntaxHighlight(CPP);
-    m_codeEditCtrl.loadDocument(*document);
-    
-    //tabCtrl.addNewTab("Second tab");
-    //tabCtrl.addNewTab("Third tab");
-  }
+      m_codeEditCtrl(*this),
+      m_documentManager(m_codeEditCtrl, m_tabCtrl)
+  {}
 
   void MainWindow::repaint() {
     // Call the OS-specific repaint routine
@@ -77,6 +65,11 @@ namespace varco {
       m_codeEditCtrl.onMouseWheel(x, y, direction);
 
     // [] Other controls' tests should go here
+  }
+
+  void MainWindow::onFileDrop(SkScalar x, SkScalar y, std::string file) {
+    // We default handling for any drag'n'drop operation to the DocumentManager
+    m_documentManager.addNewFileDocument(file);
   }
 
   void MainWindow::onLeftMouseMove(SkScalar x, SkScalar y) {

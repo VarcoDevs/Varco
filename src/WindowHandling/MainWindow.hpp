@@ -8,10 +8,9 @@
 #endif
 #include <UI/TabBar/TabBar.hpp>
 #include <UI/CodeView/CodeView.hpp>
-#include <Document/Document.hpp>
+#include <Control/DocumentManager.hpp>
 #include <SkCanvas.h>
-#include <map>
-#include <memory>
+#include <string>
 
 namespace varco {
 
@@ -30,6 +29,7 @@ namespace varco {
     void onLeftMouseDown(SkScalar x, SkScalar y) override;
     void onLeftMouseMove(SkScalar x, SkScalar y) override;
     void onMouseWheel(SkScalar x, SkScalar y, int direction) override;
+    void onFileDrop(SkScalar x, SkScalar y, std::string file) override;
     void onMouseLeave();
     void onLeftMouseUp(SkScalar x, SkScalar y) override;
     void onKeyDown(VirtualKeycode key) override;
@@ -37,11 +37,11 @@ namespace varco {
     void stopMouseCapture() override;
 
   private:
+    // Warning: keep these in order
+    // (per §12.6.2.5 these define the order for the ctor initialization list)
     TabBar m_tabCtrl;
     CodeView m_codeEditCtrl;
-
-    // A map that stores the association between a tab and a document
-    std::map<int, std::unique_ptr<Document>> m_tabDocumentMap;
+    DocumentManager m_documentManager;
   };
 
 }

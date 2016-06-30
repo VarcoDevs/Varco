@@ -97,6 +97,8 @@ namespace varco {
       return;
     }
 
+    DragAcceptFiles(this->hWnd, true);
+
     this->resize(this->Width, this->Height);
 
     // Prepare GL context
@@ -246,7 +248,24 @@ namespace varco {
         POINT pt = { coords.x, coords.y };
         ScreenToClient(this->hWnd, &pt);
         auto zDelta = (short)HIWORD(wParam);
-        this->onMouseWheel(pt.x, pt.y, (zDelta > 0) ? -1 : 1);
+        this->onMouseWheel(static_cast<SkScalar>(pt.x), static_cast<SkScalar>(pt.y), 
+                           (zDelta > 0) ? -1 : 1);
+      } break;
+
+      case WM_DROPFILES: {
+        auto coords = MAKEPOINTS(lParam);
+        POINT pt = { coords.x, coords.y };
+        ScreenToClient(this->hWnd, &pt);
+
+        HDROP drop = (HDROP)wParam;
+        char file_name[MAX_PATH];
+        auto result = DragQueryFileA(drop, 0, file_name, MAX_PATH);
+        DragFinish(drop);
+
+        if (!result) break;
+
+        std::string file(file_name);
+        this->onFileDrop(static_cast<SkScalar>(pt.x), static_cast<SkScalar>(pt.y), file);
       } break;
 
       /*case WM_SIZING: {

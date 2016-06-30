@@ -183,7 +183,7 @@ namespace varco {
 
       // Find first style for the first line to process (if any)
       {
-        auto previousSegmentIndex = m_styleDb.previousSegment[start];
+        auto previousSegmentIndex = (m_styleDb.previousSegment.size() > 0) ? m_styleDb.previousSegment[start] : -1;
         if (previousSegmentIndex == -1) {
           // There was no segment before this line, check if there's one beginning right here at character 0,
           // otherwise it means no segment was *ever* present and we switch to normal style
