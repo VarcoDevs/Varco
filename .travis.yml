@@ -29,14 +29,7 @@ matrix:
     ##########################################################################
     # Build with the main configuration on all the supported compilers
     #
-    # Note that we only use the memory checker on the main configuration to
-    # speed up Travis builds.
     ##########################################################################
-
-    # Clang 3.7
-    - os: linux
-      env: LLVM_VERSION=3.7.1
-      compiler: clang
 
     # Clang 3.8
     - os: linux
