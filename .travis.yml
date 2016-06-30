@@ -116,6 +116,12 @@ install:
       export PATH="${LLVM_DIR}/clang/bin:${PATH}"
     fi
 
+############################################################################
+# Override travis standard build process (we don't need configure & tests)
+############################################################################
+script:
+  make -j4
+
 before_script:
 
   ############################################################################
