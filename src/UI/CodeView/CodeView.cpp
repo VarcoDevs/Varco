@@ -90,11 +90,7 @@ namespace varco {
     m_document = &doc; // Save this document's address as the current one
 
     if (isControlReady() == false)
-      return; // We can't show anything if the codeview control hasn't been initialized yet
-
-    // If there was a saved vertical scrollbar position, also restore it, otherwise just set it to 0
-    setVScrollbarValue(vScrollbarPos);
-    setViewportYOffset(vScrollbarPos); // And obviously also set our viewport Y offset
+      return; // We can't show anything if the codeview control hasn't been initialized yet    
 
     // Calculate new wrap width (allow space for the vertical scrollbar if present)
     auto newWrapWidth = static_cast<int>(m_rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
@@ -109,7 +105,11 @@ namespace varco {
 
     // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
     m_verticalScrollBar->documentSizeChanged(m_document->m_maximumCharactersLine, 
-                                             m_document->m_numberOfEditorLines);    
+                                             m_document->m_numberOfEditorLines);
+
+    // If there was a saved vertical scrollbar position, also restore it, otherwise just set it to 0
+    setVScrollbarValue(vScrollbarPos);
+    setViewportYOffset(vScrollbarPos); // And obviously also set our viewport Y offset
 
     //// Set a new pixmap for rendering this document ~ caveat: this is NOT the viewport dimension
     //// since everything needs to be rendered, not just the viewport region

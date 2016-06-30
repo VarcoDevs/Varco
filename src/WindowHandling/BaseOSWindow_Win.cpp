@@ -258,14 +258,18 @@ namespace varco {
         ScreenToClient(this->hWnd, &pt);
 
         HDROP drop = (HDROP)wParam;
-        char file_name[MAX_PATH];
-        auto result = DragQueryFileA(drop, 0, file_name, MAX_PATH);
+        std::vector<std::string> files;
+        auto N = DragQueryFileA(drop, 0xFFFFFFFF, 0, 0); // Get the number of files dropped
+        for (int i = 0; i < N; ++i) {
+          char file_name[MAX_PATH];
+          auto result = DragQueryFileA(drop, i, file_name, MAX_PATH);
+          if (!result) continue;
+          files.push_back(std::string(file_name));
+        }        
         DragFinish(drop);
 
-        if (!result) break;
+        this->onFileDrop(static_cast<SkScalar>(pt.x), static_cast<SkScalar>(pt.y), files);
 
-        std::string file(file_name);
-        this->onFileDrop(static_cast<SkScalar>(pt.x), static_cast<SkScalar>(pt.y), file);
       } break;
 
       /*case WM_SIZING: {
