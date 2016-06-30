@@ -70,6 +70,15 @@ namespace varco {
     // [] Other controls' tests should go here
   }
 
+  void MainWindow::onMouseWheel(SkScalar x, SkScalar y, int direction) {
+
+    // Forward the event to a container control
+    if (isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
+      m_codeEditCtrl.onMouseWheel(x, y, direction);
+
+    // [] Other controls' tests should go here
+  }
+
   void MainWindow::onLeftMouseMove(SkScalar x, SkScalar y) {
     
     // Forward the event to a container control

@@ -467,12 +467,9 @@ namespace varco {
      //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
      // } else {
 
-static int lol = 0;
-printf("I have redrawn the damn thing %d\n", lol++);
 
-
-                           fContext->flush();
-                           glXSwapBuffers(fDisplay, fWin);
+      fContext->flush();
+      glXSwapBuffers(fDisplay, fWin);
 
       if (Width == threadWidth && Height == threadHeight) {// Check for size to be updated
         redrawNeeded = false;
@@ -481,7 +478,7 @@ printf("I have redrawn the damn thing %d\n", lol++);
         if (flags & WF_NETWM_SYNC) {
             XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
             flags &= ~WF_NETWM_SYNC;
-            printf("sync done\n");
+            //printf("sync done\n");
         }
       }
 
@@ -506,30 +503,6 @@ printf("I have redrawn the damn thing %d\n", lol++);
             std::unique_lock<std::mutex> lk(renderMutex);
             redrawNeeded = true;
             renderCV.notify_one();
-
-//
-
-//          if (!(Width > 0 && Height > 0))
-//            return true; // Nonsense painting a 0 area
-
-
-//          auto now = std::chrono::system_clock::now();
-//                 auto elapsedInterval = now - lastResizeEventTime;
-//                 auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count();
-//                 if (elapsedMs < 5) {
-//                     invalidateWindow();
-//                   return true; // Prevent resize repaint spamming
-//                 }
-
-//          // Call the OS-independent draw function
-//          auto surfacePtr = fSurface->getCanvas();
-//          this->draw(*surfacePtr);
-
-//          // Finally do the painting after the drawing is done
-//          this->paint();
-
-//          static int lol = 0;
-//          printf("Redrawing %d\n", lol++);
         }
 
         return true;
@@ -551,33 +524,18 @@ printf("I have redrawn the damn thing %d\n", lol++);
         redrawNeeded = true;
         renderCV.notify_one();
 
-
-
-
-       //lastResizeEventTime = std::chrono::system_clock::now();
-//              auto elapsedInterval = now - lastExposeEventTime;
-//              auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsedInterval).count();
-//              if (elapsedMs < 500) {
-//                return true;
-//              }
-
-//              invalidateWindow();
-//          lastExposeEventTime = std::chrono::system_clock::now();
-
-          //this->paint();
-
       } break;
 
       case ClientMessage: {
 
-          printf("Received %d\n", (int)evt->xclient.data.l[0]);
+          //printf("Received %d\n", (int)evt->xclient.data.l[0]);
 
           if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_PING)) {
               evt->xclient.window = fWin;
                   //xe->window = w->wid;
                   XSendEvent(fDisplay, DefaultRootWindow(fDisplay), False,
                       SubstructureNotifyMask | SubstructureRedirectMask, (XEvent *) evt);
-                  printf("ping!\n");
+                  //printf("ping!\n");
               }
               else if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_SYNC_REQUEST)) {
 //                  if (flags & WF_NETWM_SYNC)
@@ -585,7 +543,7 @@ printf("I have redrawn the damn thing %d\n", lol++);
                   flags |= WF_NETWM_SYNC;
                   netwm_sync_value.hi = evt->xclient.data.l[3];
                   netwm_sync_value.lo = evt->xclient.data.l[2];
-                  printf("sync request\n");
+                  //printf("sync request\n");
               }
 
         else if ((Atom)evt->xclient.data.l[0] == X_ATOM(WM_DELETE_WINDOW)) // wm_delete_window_message
@@ -600,6 +558,20 @@ printf("I have redrawn the damn thing %d\n", lol++);
             auto x = evt->xbutton.x;
             auto y = evt->xbutton.y;
             this->onLeftMouseDown(x, y);
+          } break;
+
+          case Button3: { // Right mouse
+          } break;
+
+          case Button4: { // Mouse wheel up
+            auto x = evt->xbutton.x;
+            auto y = evt->xbutton.y;
+            this->onMouseWheel(x, y, -1);
+          } break;
+          case Button5: { // Mouse wheel down
+            auto x = evt->xbutton.x;
+            auto y = evt->xbutton.y;
+            this->onMouseWheel(x, y, 1);
           } break;
 
           default:

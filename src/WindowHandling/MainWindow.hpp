@@ -29,6 +29,7 @@ namespace varco {
     void onMouseMove(SkScalar x, SkScalar y) override;
     void onLeftMouseDown(SkScalar x, SkScalar y) override;
     void onLeftMouseMove(SkScalar x, SkScalar y) override;
+    void onMouseWheel(SkScalar x, SkScalar y, int direction) override;
     void onMouseLeave();
     void onLeftMouseUp(SkScalar x, SkScalar y) override;
     void onKeyDown(VirtualKeycode key) override;

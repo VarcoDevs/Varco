@@ -34,6 +34,7 @@ namespace varco {
     void onLeftMouseDown(SkScalar x, SkScalar y);
     void onLeftMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
+    void onMouseWheel(SkScalar x, SkScalar y, int direction);
     
     void setViewportYOffset(SkScalar value);
 
@@ -45,7 +46,7 @@ namespace varco {
 
     sk_sp<SkTypeface> m_typeface; // Font used throughout the control
     SkPaint m_fontPaint; // Paint data for the font
-    int m_textSize = 15;
+    int m_textSize = 14;
 
     SkScalar m_characterWidthPixels, m_characterHeightPixels;
     int m_wrapWidthInPixels = 0;

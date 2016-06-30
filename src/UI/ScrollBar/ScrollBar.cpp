@@ -202,4 +202,18 @@ namespace varco {
     }
   }
 
+  void ScrollBar::onMouseWheel(SkScalar x, SkScalar y, int direction) {
+    if (direction == 0) return;
+
+    if (direction == 1) // up
+      m_value = clamp(m_value + 5, 0.f, static_cast<SkScalar>(m_maximum));
+    else if (direction == -1) // down
+      m_value = clamp(m_value - 5, 0.f, static_cast<SkScalar>(m_maximum));
+
+    m_sliderChangeCallback((m_value / static_cast<SkScalar>(m_maximum)) * (m_internalLineCount - 1)); // Signal to the parent that slider has changed
+
+    m_dirty = true;
+    m_parentContainer.repaint();
+  }
+
 }

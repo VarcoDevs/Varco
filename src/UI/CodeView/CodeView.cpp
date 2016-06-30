@@ -14,16 +14,9 @@ namespace varco {
     : UIElement(parentContainer), m_threadPool(15)
   {
     // Create a monospace typeface
-
-    const char *fontFamily =
-#ifdef _WIN32
-        "Consolas";
-#elif defined __linux__
-        "Ubuntu Mono";
-#endif
     // An alternative approach here is to ship a standard font for every/each platform
     // e.g. SkTypeface::MakeFromFile("/home/alex/Desktop/UbuntuMono-R.ttf");
-    m_typeface = SkTypeface::MakeFromName(fontFamily, SkFontStyle{SkFontStyle::Weight::kNormal_Weight,
+    m_typeface = SkTypeface::MakeFromName("monospace", SkFontStyle{SkFontStyle::Weight::kNormal_Weight,
                                                                   SkFontStyle::Width::kNormal_Width,
                                                                   SkFontStyle::Slant::kUpright_Slant}); // Or closest match
 
@@ -31,7 +24,8 @@ namespace varco {
     // every document to use it) and the height of a line in pixels, plus the paint used for each of them
     m_fontPaint.setTextSize(SkIntToScalar(m_textSize));
     m_fontPaint.setAntiAlias(true);
-    m_fontPaint.setLCDRenderText(true);
+    m_fontPaint.setAutohinted(true);
+    //m_fontPaint.setLCDRenderText(true);
     m_fontPaint.setTypeface(m_typeface);
 
     // The following is a conservative approach including kerning, hinting and antialiasing (a bit too much)
@@ -160,6 +154,10 @@ namespace varco {
 
     if (m_verticalScrollBar && isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(), m_verticalScrollBar->getRect(relativeToParentRect)))
       m_verticalScrollBar->onLeftMouseDown(relativeToParentCtrl.x(), relativeToParentCtrl.y());
+  }
+
+  void CodeView::onMouseWheel(SkScalar x, SkScalar y, int direction) {
+    m_verticalScrollBar->onMouseWheel(x, y, direction);
   }
 
   void CodeView::onLeftMouseMove(SkScalar x, SkScalar y) {

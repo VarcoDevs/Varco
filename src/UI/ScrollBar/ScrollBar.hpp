@@ -31,6 +31,7 @@ namespace varco {
     void onLeftMouseDown(SkScalar x, SkScalar y);
     void onLeftMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
+    void onMouseWheel(SkScalar x, SkScalar y, int direction);
 
     void setLineHeightPixels(SkScalar height);
     void documentSizeChanged(const int width_in_characters, const int height_in_lines);

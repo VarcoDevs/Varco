@@ -145,7 +145,8 @@ namespace varco {
       SkPaint painter;
       painter.setTextSize(SkIntToScalar(m_codeView.m_textSize));
       painter.setAntiAlias(true);
-      painter.setLCDRenderText(true);
+      //painter.setLCDRenderText(true);
+      painter.setAutohinted(true);
       painter.setTypeface(m_codeView.m_typeface);
       painter.setColor(SK_ColorWHITE);
 
