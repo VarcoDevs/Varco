@@ -9,6 +9,8 @@
 #include <GrContext.h>
 //#include <SkGr.h>
 #include <vector>
+#include <string>
+#include <cctype>
 
 namespace varco {
 

@@ -15,8 +15,6 @@ list (APPEND LIBS ${OPENGL_LIBRARIES})
 
 ########################################### Skia dependency ###########################################
 
-# This shields us against Skia compile-time macros used in headers
-set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DSK_DEBUG")
 # No gpu log calls in debug
 set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGR_GL_LOG_CALLS=0 -DGR_GL_CHECK_ERROR=0")
 
