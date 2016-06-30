@@ -120,7 +120,8 @@ install:
 # Override travis standard build process (we don't need configure & tests)
 ############################################################################
 script:
-  make varco -j4
+  - ls
+  - make all -j4
 
 before_script:
 
