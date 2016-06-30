@@ -41,7 +41,7 @@ namespace varco {
   void DocumentManager::addNewFileDocument(std::string filePath) {
     auto fileName = stripFileName(filePath);
     int id = m_tabCtrl.addNewTab(fileName);
-    
+
     auto it = m_tabDocumentMap.emplace(id, std::make_unique<Document>(m_codeEditCtrl));
     Document *document = it.first->second.get();
     document->loadFromFile(filePath);

@@ -67,9 +67,10 @@ namespace varco {
     // [] Other controls' tests should go here
   }
 
-  void MainWindow::onFileDrop(SkScalar x, SkScalar y, std::string file) {
+  void MainWindow::onFileDrop(SkScalar x, SkScalar y, std::vector<std::string> files) {
     // We default handling for any drag'n'drop operation to the DocumentManager
-    m_documentManager.addNewFileDocument(file);
+    for(auto& file : files)
+      m_documentManager.addNewFileDocument(file);
   }
 
   void MainWindow::onLeftMouseMove(SkScalar x, SkScalar y) {

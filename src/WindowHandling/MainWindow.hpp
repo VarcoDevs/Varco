@@ -29,7 +29,7 @@ namespace varco {
     void onLeftMouseDown(SkScalar x, SkScalar y) override;
     void onLeftMouseMove(SkScalar x, SkScalar y) override;
     void onMouseWheel(SkScalar x, SkScalar y, int direction) override;
-    void onFileDrop(SkScalar x, SkScalar y, std::string file) override;
+    void onFileDrop(SkScalar x, SkScalar y, std::vector<std::string> files) override;
     void onMouseLeave();
     void onLeftMouseUp(SkScalar x, SkScalar y) override;
     void onKeyDown(VirtualKeycode key) override;

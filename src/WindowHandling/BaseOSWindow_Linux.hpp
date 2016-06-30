@@ -36,6 +36,7 @@ namespace varco {
     virtual void onLeftMouseDown(SkScalar x, SkScalar y) = 0;
     virtual void onLeftMouseMove(SkScalar x, SkScalar y) = 0;
     virtual void onMouseWheel(SkScalar x, SkScalar y, int direction) = 0;
+    virtual void onFileDrop(SkScalar x, SkScalar y, std::vector<std::string> files) = 0;
     void startMouseCapture();
     void stopMouseCapture();
     virtual void onMouseLeave() = 0;
@@ -88,6 +89,9 @@ namespace varco {
     XSyncValue netwm_sync_value;
     int flags = 0;
 
+    bool m_XDNDInProgress = false; // Drag and drop currently in progress?
+    SkPoint m_XDNDPos; // Position of current drag and drop
+    std::vector<Atom> m_supportedXDNDMimes;
   };
 
 }

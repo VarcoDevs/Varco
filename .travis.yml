@@ -104,8 +104,7 @@ install:
 # Override travis standard build process (we don't need configure & tests)
 ############################################################################
 script:
-  - cd build
-  - make -j4
+  - cd build && make -j4
 
 before_script:
 

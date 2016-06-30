@@ -21,7 +21,8 @@ namespace varco {
      return (e->type == MapNotify) && (e->xmap.window == (Window)arg);
   }
 
-
+  // A list of atoms - an atom is a short string with an associated number representing properties
+  // or messages within the X11 system.
   enum {
       _X_ATOM_INDEX_UTF8_STRING,
       _X_ATOM_INDEX_WM_PROTOCOLS,
@@ -47,10 +48,15 @@ namespace varco {
       _X_ATOM_INDEX_XdndDrop,
       _X_ATOM_INDEX_XdndFinished,
       _X_ATOM_INDEX_XdndTypeList,
+      _X_ATOM_INDEX_XdndSelection,
+      _X_ATOM_INDEX_XdndActionCopy,
+      _X_ATOM_INDEX_XdndActionPrivate,
       _X_ATOM_INDEX_MIME_TYPE_text__plain,
       _X_ATOM_INDEX_MIME_TYPE_text__unicode,
       _X_ATOM_INDEX_MIME_TYPE_text__x_moz_url,
       _X_ATOM_INDEX_MIME_TYPE_text__uri_list,
+      _X_ATOM_INDEX_PRIMARY,
+      _X_ATOM_INDEX_CLIPBOARD
   };
   static const char *const atom_names[] = {
       "UTF8_STRING",
@@ -77,16 +83,22 @@ namespace varco {
       "XdndDrop",
       "XdndFinished",
       "XdndTypeList",
+      "XdndSelection",
+      "XdndActionCopy",
+      "XdndActionPrivate",
       "text/plain",
       "text/unicode",
       "text/x-moz-url",
       "text/uri-list",
+      "PRIMARY",
+      "CLIPBOARD"
   };
   #define X_ATOM(name) __lwi_atoms[_X_ATOM_INDEX_##name]
   #define NELEMS(a) (sizeof(a) / sizeof((a)[0]))
 
   Atom __lwi_atoms[NELEMS(atom_names)];
 
+  // X extensions for sync protocol
   static const int WF_NETWM_SYNC  = 0x20;
 
   enum {
@@ -101,7 +113,7 @@ namespace varco {
 
   #define X __lwi_context
 
-   #define X_HAS_EXTENSION(n) (X.extensions & (1 << (n)))
+  #define X_HAS_EXTENSION(n) (X.extensions & (1 << (n)))
 
   /* X extensions */
   #define X_HAS_DBE     X_HAS_EXTENSION(_X_EXTENSION_DBE)
@@ -136,12 +148,11 @@ namespace varco {
     auto ret = XSyncQueryExtension(fDisplay, &a, &b);
     ret = XSyncInitialize(fDisplay, &a, &b);
 
-
+    // Load up the atom ids for the required ones
     for (unsigned i = 0; i < NELEMS(atom_names); i++) {
-            __lwi_atoms[i] = XInternAtom(fDisplay, atom_names[i], False);
-            printf("%s is now [%d]\n", atom_names[i], (int)__lwi_atoms[i]);
-      }
-
+      __lwi_atoms[i] = XInternAtom(fDisplay, atom_names[i], False);
+            //printf("%s is now [%d]\n", atom_names[i], (int)__lwi_atoms[i]);
+    }
 
 
     
@@ -196,50 +207,68 @@ namespace varco {
                          CWEventMask | CWColormap,
                          &swa);
 
-
+    // Register for the WM_SYNC protocol and ping requests
     Atom wm_protocols[] = {
-            X_ATOM(WM_DELETE_WINDOW),
-            X_ATOM(WM_TAKE_FOCUS),
-            X_ATOM(_NET_WM_PING),
-            X_ATOM(_NET_WM_SYNC_REQUEST),
-            X_ATOM(_NET_WM_SYNC_REQUEST_COUNTER)
-        };
-        ret = XSetWMProtocols(fDisplay, fWin, wm_protocols, NELEMS(wm_protocols));
+        X_ATOM(WM_DELETE_WINDOW),
+        X_ATOM(WM_TAKE_FOCUS),
+        X_ATOM(_NET_WM_PING),
+        X_ATOM(_NET_WM_SYNC_REQUEST),
+        X_ATOM(_NET_WM_SYNC_REQUEST_COUNTER)
+    };
+    ret = XSetWMProtocols(fDisplay, fWin, wm_protocols, NELEMS(wm_protocols));
 
-        /* wm protocol for killing hung process */
-        XSetWMProperties(fDisplay, fWin, NULL, NULL, NULL, 0, NULL, NULL, NULL);
+    // WM protocol for killing hung process
+    XSetWMProperties(fDisplay, fWin, NULL, NULL, NULL, 0, NULL, NULL, NULL);
 
-        Atom *list;
-        int len;
-        ret = XGetWMProtocols(fDisplay, fWin, &list, &len);
-        for(int i=0; i < len; ++i)
-          printf("%d\n", (int)list[i]);
+    Atom *list;
+    int len;
+    ret = XGetWMProtocols(fDisplay, fWin, &list, &len);
+    //for(int i=0; i < len; ++i)
+    //  printf("%d\n", (int)list[i]);
 
-        pid_t pid = getpid();
-        ret = XChangeProperty(
-            fDisplay, fWin, X_ATOM(_NET_WM_PID), XA_CARDINAL, 32,
-            PropModeReplace, (unsigned char *) &pid, 1);
+    pid_t pid = getpid();
+    ret = XChangeProperty (fDisplay, fWin, X_ATOM(_NET_WM_PID), XA_CARDINAL, 32,
+                           PropModeReplace, (unsigned char *) &pid, 1);
 
+    netwm_sync_value.hi = 0;
+    netwm_sync_value.lo = 0;
+    netwm_sync_counter = XSyncCreateCounter(fDisplay, netwm_sync_value);
+    ret = XChangeProperty (fDisplay, fWin, X_ATOM(_NET_WM_SYNC_REQUEST_COUNTER), XA_CARDINAL, 32,
+                           PropModeReplace, (unsigned char *) &netwm_sync_counter, 1);
 
-            netwm_sync_value.hi = 0;
-            netwm_sync_value.lo = 0;
-            netwm_sync_counter = XSyncCreateCounter(fDisplay, netwm_sync_value);
-            ret = XChangeProperty(
-                fDisplay, fWin, X_ATOM(_NET_WM_SYNC_REQUEST_COUNTER), XA_CARDINAL, 32,
-                PropModeReplace, (unsigned char *) &netwm_sync_counter, 1);
-
-            flags |= WF_NETWM_SYNC;
+    flags |= WF_NETWM_SYNC;
 
 
-    XStoreName(fDisplay, fWin, "Varco");
+    XStoreName (fDisplay, fWin, "Varco");
 
-    fGc = XCreateGC(fDisplay, fWin, 0, nullptr);
+    fGc = XCreateGC (fDisplay, fWin, 0, nullptr);
+
+
+    // Signal XDND (Drag'n'Drop) support
+    Atom XdndAware = X_ATOM(XdndAware);
+    Atom version = 5;
+    auto status = XChangeProperty (fDisplay, fWin, XdndAware, XA_ATOM, 32, PropModeReplace,
+                                   (unsigned char*)&version, 1);
+
+    if (status == BadAlloc || status == BadAtom || status == BadMatch || status == BadValue
+        || status == BadWindow)
+      throw std::runtime_error("Could not initialize XDND");
+
+    // Signal the MIME types we support for XDND
+    m_supportedXDNDMimes.push_back(X_ATOM(MIME_TYPE_text__plain));
+    m_supportedXDNDMimes.push_back(X_ATOM(MIME_TYPE_text__uri_list));
+
+    status = XChangeProperty(fDisplay, fWin, X_ATOM(XdndTypeList), XA_ATOM, 32, PropModeAppend,
+                             (unsigned char *)m_supportedXDNDMimes.data(), m_supportedXDNDMimes.size());
+    if (status == BadAlloc || status == BadAtom || status == BadMatch || status == BadValue
+        || status == BadWindow)
+      throw std::runtime_error("Could not initialize XDND");
 
     // OpenGL initialization
     fGLContext = glXCreateContext(fDisplay, fVi, nullptr, GL_TRUE);
     fSharedGLContext = glXCreateContext(fDisplay, fVi, fGLContext, GL_TRUE);
     if (fGLContext == nullptr || fSharedGLContext == nullptr)
-      throw std::runtime_error("Could not create an OpenGL context");    
+      throw std::runtime_error("Could not create an OpenGL context");
 
     auto res = glXMakeCurrent(fDisplay, fWin, fGLContext);
     if (res == false)
@@ -528,26 +557,124 @@ namespace varco {
 
       case ClientMessage: {
 
-          //printf("Received %d\n", (int)evt->xclient.data.l[0]);
+        //printf("Received %d\n", (int)evt->xclient.data.l[0]);
 
-          if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_PING)) {
-              evt->xclient.window = fWin;
-                  //xe->window = w->wid;
-                  XSendEvent(fDisplay, DefaultRootWindow(fDisplay), False,
-                      SubstructureNotifyMask | SubstructureRedirectMask, (XEvent *) evt);
-                  //printf("ping!\n");
-              }
-              else if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_SYNC_REQUEST)) {
-//                  if (flags & WF_NETWM_SYNC)
-//                      XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
-                  flags |= WF_NETWM_SYNC;
-                  netwm_sync_value.hi = evt->xclient.data.l[3];
-                  netwm_sync_value.lo = evt->xclient.data.l[2];
-                  //printf("sync request\n");
-              }
+        // Synchronization protocol support
+        if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_PING)) {
+            evt->xclient.window = fWin;
+            //xe->window = w->wid;
+            XSendEvent(fDisplay, DefaultRootWindow(fDisplay), False,
+                       SubstructureNotifyMask | SubstructureRedirectMask, (XEvent *) evt);
+            //printf("ping!\n");
+          } else if ((Atom)evt->xclient.data.l[0] == X_ATOM(_NET_WM_SYNC_REQUEST)) {
+//           if (flags & WF_NETWM_SYNC)
+//               XSyncSetCounter(fDisplay, netwm_sync_counter, netwm_sync_value);
+            flags |= WF_NETWM_SYNC;
+            netwm_sync_value.hi = evt->xclient.data.l[3];
+            netwm_sync_value.lo = evt->xclient.data.l[2];
+            //printf("sync request\n");
+          }
 
-        else if ((Atom)evt->xclient.data.l[0] == X_ATOM(WM_DELETE_WINDOW)) // wm_delete_window_message
-          return false;
+          if ((Atom)evt->xclient.data.l[0] == X_ATOM(WM_DELETE_WINDOW)) // wm_delete_window_message
+            return false;
+
+          // Drag and drop support
+          if (evt->xclient.message_type == X_ATOM(XdndEnter)) {
+            // Drag and drop was initiated, keep track of drop position
+            m_XDNDInProgress = true;
+          } else if (m_XDNDInProgress && evt->xclient.message_type == X_ATOM(XdndDrop)) {
+            // Drop event
+            // xdnd_source_window = e.xclient.data.l[0];
+            Window ownerOfSelection = XGetSelectionOwner(this->fDisplay, X_ATOM(XdndSelection));
+
+            // Use primary buffer to store the selection
+            XConvertSelection (this->fDisplay, X_ATOM(XdndSelection), m_supportedXDNDMimes[0],
+                               X_ATOM(XdndSelection), this->fWin, CurrentTime);
+
+            // Send "Finished"
+            XEvent xevent;
+            memset (&xevent, 0, sizeof (xevent));
+            xevent.xany.type = ClientMessage;
+            xevent.xany.display = this->fDisplay;
+            xevent.xclient.window = ownerOfSelection;
+            xevent.xclient.message_type = X_ATOM(XdndFinished);
+            xevent.xclient.format = 32;
+            xevent.xclient.data.l[0] = this->fWin;
+            XSendEvent (this->fDisplay, ownerOfSelection, 0, 0, &xevent);
+
+            XFlush (this->fDisplay);
+
+          } else if (m_XDNDInProgress && evt->xclient.message_type == X_ATOM(XdndPosition)) {
+            // Change of position while drag'n'dropping
+            m_XDNDPos.set(evt->xclient.data.l[2]  >> 16, evt->xclient.data.l[2] & 0xffff);
+
+            // Reply to source with XDND ready
+            XEvent xevent;
+            memset(&xevent, sizeof(xevent), 0);
+            xevent.xany.type = ClientMessage;
+            xevent.xany.display = this->fDisplay;
+            xevent.xclient.window = evt->xclient.data.l[0]; // source
+            xevent.xclient.message_type = X_ATOM(XdndStatus);
+            xevent.xclient.format = 32;
+            xevent.xclient.data.l[0] = this->fWin;
+            xevent.xclient.data.l[1] = 1; // Yes, we'll handle it
+            xevent.xclient.data.l[2] = 0; // rectangle
+            xevent.xclient.data.l[3] = 0;
+            xevent.xclient.data.l[4] = X_ATOM(XdndActionPrivate);
+
+            XSendEvent (this->fDisplay, evt->xclient.data.l[0] /* to source */, False, NoEventMask, &xevent);
+            XFlush (this->fDisplay);
+
+          } else if(m_XDNDInProgress && evt->xclient.message_type == X_ATOM(XdndLeave)) {
+            // Drag and drop cancelled
+            m_XDNDInProgress = false;
+          }
+
+      } break;
+
+      // Selections in X are transfers between a source and target window. We need those to handle events
+      // like XDND (drag'n'drop) or clipboard operations
+      case SelectionNotify: {
+
+          Window ownerOfSelection = XGetSelectionOwner(this->fDisplay, X_ATOM(XdndSelection));
+
+          if (evt->xselection.property == None)
+            return false; // Could not get filenames
+
+          // Get the list of filenames dropped
+          std::vector<std::string> filenames;
+          int             offset = 0;
+          unsigned long   bytesRemaining;
+          unsigned long   numItems = 0;
+          unsigned char*  s = nullptr;
+          Atom            actualType;
+          int             actualFormat;
+          do {
+            if (XGetWindowProperty(this->fDisplay, evt->xany.window, X_ATOM(XdndSelection),
+                                   offset / sizeof(unsigned char *), 1024, False, AnyPropertyType,
+                                   &actualType, &actualFormat, &numItems, &bytesRemaining, &s) != Success)
+              return false; // Failure
+
+            filenames.push_back(std::string((char*)s));
+            // Strip URI identifiers and end whitespaces
+            {
+              std::string& str = filenames.back();
+              size_t i = str.size() - 1;
+              for(; i >= 0; --i) {
+                  if (std::isspace(str[i]) == 0)
+                    break;
+              }
+              if (str.size() != i)
+                str = str.substr(0, i + 1);
+              if(str.find("file://") == 0)
+                str = str.substr(sizeof("file://") - 1);
+            }
+
+            offset += numItems;
+          } while (bytesRemaining > 0);
+
+          this->onFileDrop(m_XDNDPos.x(), m_XDNDPos.y(), filenames);
+
       } break;
 
       case ButtonPress: { // Mouse input down
