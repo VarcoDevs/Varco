@@ -9,6 +9,13 @@ sudo: false
 branches:
   except: /pr\/.*/
 
+addons:
+  apt:
+    packages:
+      - g++-6
+    sources: &sources
+      - ubuntu-toolchain-r-test
+
 cache:
   directories:
     - ${TRAVIS_BUILD_DIR}/deps/llvm-3.6.2
