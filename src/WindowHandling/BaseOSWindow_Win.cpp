@@ -241,6 +241,14 @@ namespace varco {
         this->onLeftMouseUp(coords.x, coords.y);
       } break;
 
+      case WM_MOUSEWHEEL: {
+        auto coords = MAKEPOINTS(lParam);
+        POINT pt = { coords.x, coords.y };
+        ScreenToClient(this->hWnd, &pt);
+        auto zDelta = (short)HIWORD(wParam);
+        this->onMouseWheel(pt.x, pt.y, (zDelta > 0) ? -1 : 1);
+      } break;
+
       /*case WM_SIZING: {
         RECT *rect = (RECT*)lParam;
         auto width = rect->right - rect->left;

@@ -16,16 +16,23 @@ namespace varco {
     // Create a monospace typeface
     // An alternative approach here is to ship a standard font for every/each platform
     // e.g. SkTypeface::MakeFromFile("/home/alex/Desktop/UbuntuMono-R.ttf");
-    m_typeface = SkTypeface::MakeFromName("monospace", SkFontStyle{SkFontStyle::Weight::kNormal_Weight,
-                                                                  SkFontStyle::Width::kNormal_Width,
-                                                                  SkFontStyle::Slant::kUpright_Slant}); // Or closest match
+    const char *font_family =
+#ifdef _WIN32
+      "Consolas";
+#elif defined __linux__
+      "monospace";
+#endif
+    // Try to match with the supplied font name or family name (or closest match)
+    m_typeface = SkTypeface::MakeFromName(font_family, SkFontStyle{SkFontStyle::Weight::kNormal_Weight,
+                                                                   SkFontStyle::Width::kNormal_Width,
+                                                                   SkFontStyle::Slant::kUpright_Slant});
 
     // Stores the width of a single character in pixels with the given font (cache this value for
     // every document to use it) and the height of a line in pixels, plus the paint used for each of them
     m_fontPaint.setTextSize(SkIntToScalar(m_textSize));
     m_fontPaint.setAntiAlias(true);
     m_fontPaint.setAutohinted(true);
-    //m_fontPaint.setLCDRenderText(true);
+    m_fontPaint.setLCDRenderText(true);
     m_fontPaint.setTypeface(m_typeface);
 
     // The following is a conservative approach including kerning, hinting and antialiasing (a bit too much)

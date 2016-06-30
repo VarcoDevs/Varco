@@ -33,6 +33,7 @@ namespace varco {
     virtual void onMouseMove(SkScalar x, SkScalar y) = 0;
     virtual void onLeftMouseDown(SkScalar x, SkScalar y) = 0;
     virtual void onLeftMouseMove(SkScalar x, SkScalar y) = 0;
+    virtual void onMouseWheel(SkScalar x, SkScalar y, int direction) = 0;
     void startMouseCapture();
     void stopMouseCapture();
     virtual void onMouseLeave() = 0;
