@@ -24,7 +24,7 @@ namespace varco {
 
   namespace {
     std::string stripFileName(const std::string& filePath) {
-      for (int i = filePath.size() - 1; i >= 0; --i) {
+      for (int i = static_cast<int>(filePath.size() - 1); i >= 0; --i) {
         if (filePath[i] == '\\' || filePath[i] == '/')
           return filePath.substr(i + 1);
       }

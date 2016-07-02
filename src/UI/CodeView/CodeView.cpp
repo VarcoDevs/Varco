@@ -63,7 +63,7 @@ namespace varco {
      *
      */
     m_fontPaint.getFontMetrics(&m_fontMetrics);
-    m_characterHeightPixels = m_fontPaint.getFontSpacing();
+    m_characterHeightPixels = m_fontMetrics.fBottom - m_fontMetrics.fTop;
 
     // Create the vertical scrollbar
     m_verticalScrollBar = std::make_unique<ScrollBar>(*this, [&](SkScalar value) {

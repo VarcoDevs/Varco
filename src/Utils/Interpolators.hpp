@@ -42,7 +42,7 @@ namespace varco {
       if (ms > m_milliseconds)
         return -1; // Invalid
 
-      return (static_cast<float>(ms) / static_cast<float>(m_milliseconds)) * (m_endValue - m_startValue) + m_startValue;
+      return static_cast<int>((static_cast<float>(ms) / m_milliseconds) * (m_endValue - m_startValue) + m_startValue);
 //      auto end = std::chrono::high_resolution_clock::now();
 //      int elapsedMs = 0;
 

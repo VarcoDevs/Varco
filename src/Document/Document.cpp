@@ -116,7 +116,7 @@ namespace varco {
       if (maxChars < 10)
         maxChars = 10; // Keep it to a minimum
 
-      const SkScalar fontDescent = m_codeView.getFontMetrics().fDescent; // Relative to baseline (see CodeView ctor)
+      const SkScalar fontDescent = m_codeView.getFontMetrics().fDescent; // Relative to baseline (see CodeView ctor)      
 
       SkScalar bitmapEffectiveHeight = 0; // This is NOT know before the computation
       SkScalar bitmapEffectiveWidth = 0;
@@ -307,9 +307,12 @@ namespace varco {
           //
           // Finally draw the text
           //
-          std::string ts(el.m_characters.data() + charsRendered, nextPosToReach - charsRendered);          
+          std::string ts(el.m_characters.data() + charsRendered, nextPosToReach - charsRendered);
 
-          canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y - fontDescent, painter);
+          if (ts.find("FACK") != std::string::npos)
+            printf("lol");
+
+          canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y - fontDescent, painter); // Notice the fontDescent!
           charsRendered += ts.size();
           startpoint.x += m_characterWidthPixels * ts.size();
 

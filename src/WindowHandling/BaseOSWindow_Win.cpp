@@ -260,7 +260,7 @@ namespace varco {
         HDROP drop = (HDROP)wParam;
         std::vector<std::string> files;
         auto N = DragQueryFileA(drop, 0xFFFFFFFF, 0, 0); // Get the number of files dropped
-        for (int i = 0; i < N; ++i) {
+        for (UINT i = 0; i < N; ++i) {
           char file_name[MAX_PATH];
           auto result = DragQueryFileA(drop, i, file_name, MAX_PATH);
           if (!result) continue;

@@ -36,6 +36,7 @@ namespace varco {
 
     // Also update the maximum allowed to let the last line to be scrolled till the beginning of the view
     m_maximum = m_internalLineCount - 1;
+
     m_value = clamp(m_value, 0.f, static_cast<SkScalar>(m_maximum));
 
     m_dirty = true; // Control needs to be redrawn and slider position to be recalculated
@@ -163,6 +164,8 @@ namespace varco {
       m_mouseTrackingStartValue = m_value;
       m_parentContainer.startMouseCapture();
     } else {
+      if (m_maximum == 0) return; // Not allowed to scroll
+
       // A click was detected but NOT on the slider. Move the slider at the click position
       SkScalar y = relativeToParentCtrl.y() * m_internalLineCount / getRect().height();
       m_value = clamp(y, 0.f, static_cast<SkScalar>(m_maximum));
@@ -179,6 +182,8 @@ namespace varco {
   void ScrollBar::onMouseMove(SkScalar x, SkScalar y) {
     
     if (m_sliderIsBeingDragged == true) {
+      if (m_maximum == 0) return; // Not allowed to scroll
+
       SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);      
 
       // It is important to note that even if the mouse did a complete document tracking (i.e. from line 0 to the last
@@ -188,7 +193,7 @@ namespace varco {
       auto delta = (relativeToParentCtrl.y() - m_mouseTrackingStartPoint.y());
       int y = static_cast<int>(delta * m_internalLineCount / (getRect(absoluteRect).height() - m_slider.m_length));
       m_value = clamp(m_mouseTrackingStartValue + y, 0.f, static_cast<SkScalar>(m_maximum));
-      m_sliderChangeCallback((m_value / m_maximum) * (m_internalLineCount - 1)); // Signal to the parent that slider has changed
+      m_sliderChangeCallback((SkScalar(m_value) / SkScalar(m_maximum)) * (m_internalLineCount - 1)); // Signal to the parent that slider has changed
     }
 
     m_dirty = true;
@@ -203,6 +208,7 @@ namespace varco {
   }
 
   void ScrollBar::onMouseWheel(SkScalar x, SkScalar y, int direction) {
+    if (m_maximum == 0) return; // Not allowed to scroll
     if (direction == 0) return;
 
     if (direction == 1) // up
@@ -210,7 +216,7 @@ namespace varco {
     else if (direction == -1) // down
       m_value = clamp(m_value - 5, 0.f, static_cast<SkScalar>(m_maximum));
 
-    m_sliderChangeCallback((m_value / static_cast<SkScalar>(m_maximum)) * (m_internalLineCount - 1)); // Signal to the parent that slider has changed
+    m_sliderChangeCallback((SkScalar(m_value) / SkScalar(m_maximum)) * (m_internalLineCount - 1)); // Signal to the parent that slider has changed
 
     m_dirty = true;
     m_parentContainer.repaint();

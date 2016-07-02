@@ -68,4 +68,4 @@ int main() {
   testClass obj;
   int vardecl = 22;
   return 0;
-}
+FACK}

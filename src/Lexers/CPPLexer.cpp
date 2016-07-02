@@ -137,7 +137,7 @@ namespace varco {
     try {
       globalScope();
     }
-    catch (std::out_of_range&) {
+    catch (...) {
       // g_debug << "Parsing terminated!";
     }
   }
@@ -285,6 +285,9 @@ namespace varco {
       }
       else if (str->at(pos) == '}') {
         ++pos;
+
+        if (m_scopesStack.empty())
+          throw std::out_of_range("Invalid scope end");
 
         if (m_classKeywordActiveOnScope == m_scopesStack.top())
           m_classKeywordActiveOnScope = -2; // Exited a class scope
