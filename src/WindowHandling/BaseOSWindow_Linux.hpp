@@ -69,7 +69,7 @@ namespace varco {
   private:
 
     void mapWindowAndWait();
-    void invalidateWindow();
+    void invalidateWindow(bool flush = true);
     std::chrono::time_point<std::chrono::system_clock> lastResizeEventTime;
     std::unique_ptr<std::thread> redrawThread;
     bool fNeedDraw = true;

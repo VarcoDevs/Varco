@@ -44,7 +44,6 @@ namespace varco {
     m_codeEditCtrl.resize(codeEditCtrlRect);
     m_codeEditCtrl.paint();
     canvas.drawBitmap(m_codeEditCtrl.getBitmap(), 0, 33.0f);
-
   }
 
   void MainWindow::onLeftMouseDown(SkScalar x, SkScalar y) {

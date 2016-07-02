@@ -12,6 +12,8 @@
 #include <string>
 #include <cctype>
 
+#include <iostream> // DEBUG
+
 namespace varco {
 
   // Events we'll be listening for
@@ -293,7 +295,6 @@ namespace varco {
     XEvent event;
     XIfEvent(fDisplay, &event, WaitForNotify, (char*)fWin);
 
-
 //    XSynchronize(fDisplay, True); // for debugging purposes, report all errors immediately
 //    Atom *atomList;
 //    int atomLen;
@@ -335,8 +336,11 @@ namespace varco {
   }
 
   BaseOSWindow::~BaseOSWindow() {
+    XDestroyWindow(fDisplay, fWin);
     glXMakeCurrent(fDisplay, None, nullptr);
+    glXDestroyContext(fDisplay, fSharedGLContext);
     glXDestroyContext(fDisplay, fGLContext);
+    XCloseDisplay(fDisplay);
   }
 
   GrRenderTarget* BaseOSWindow::setupRenderTarget(int width, int heigth) {
@@ -378,7 +382,7 @@ namespace varco {
 
   }
 
-  void BaseOSWindow::invalidateWindow() { // Fire a redraw() event
+  void BaseOSWindow::invalidateWindow(bool flush) { // Fire a redraw() event
 
     // X expose events are often fired at a blazing speed (for instance when resizing).
     // Since we can't keep up with all of them, this code prevents two events from being
@@ -401,7 +405,8 @@ namespace varco {
     evt.type = Expose;
     evt.xexpose.window = fWin;
     XSendEvent(fDisplay, fWin, False, ExposureMask, &evt);
-    XFlush(fDisplay);
+    if (flush)
+      XFlush(fDisplay);
     //  }
     //lastExposeEventTime = std::chrono::system_clock::now();
   }
@@ -468,8 +473,10 @@ namespace varco {
       if (!(Width > 0 && Height > 0))
         continue; // Nonsense painting a 0 area
 
-      if(stopRendering == true)
+      if(stopRendering == true) {
+        fContext->releaseResourcesAndAbandonContext();
         return;
+      }
 
       bool resizing = false;
       if (Width != threadWidth || Height != threadHeight) {
@@ -492,8 +499,10 @@ namespace varco {
       auto surfacePtr = fSurface->getCanvas();
       this->draw(*surfacePtr);
 
-      if(stopRendering == true)
+      if(stopRendering == true) {
+        fContext->releaseResourcesAndAbandonContext();
         return;
+      }
 
       //if (resizing) {
      //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -501,7 +510,7 @@ namespace varco {
 
 
       fContext->flush();
-      glXSwapBuffers(fDisplay, fWin);
+      glXSwapBuffers(fDisplay, fWin);      
 
       if (Width == threadWidth && Height == threadHeight) {// Check for size to be updated
         redrawNeeded = false;
@@ -535,7 +544,7 @@ namespace varco {
             std::unique_lock<std::mutex> lk(renderMutex);
             redrawNeeded = true;
             renderCV.notify_one();
-        }
+        }        
 
         return true;
 
@@ -765,10 +774,13 @@ namespace varco {
     std::function<void(void)> renderProc = std::bind(&BaseOSWindow::renderThreadFn, this);
     renderThread = std::thread(renderProc);
 
-    bool exitRequested = false;
+    invalidateWindow(false); // Fire a redraw event and keep it in the queue
+
+    //bool exitRequested = false;
     while(true) {
 
       XEvent evt;
+      //while(XPending(fDisplay)) // Do not use - skips events
       XNextEvent(fDisplay, &evt);
 
       bool continueLoop = true;
@@ -785,7 +797,7 @@ namespace varco {
         break;
     }
 
-    renderThread.detach();
+    renderThread.join();
 
     return 0;
   }

@@ -11,8 +11,7 @@ namespace varco {
 #define VSCROLLBAR_WIDTH 15
 
   CodeView::CodeView(UIElement<ui_container_tag>& parentContainer)
-    : UIElement(parentContainer), m_threadPool(15),
-      m_caretInterpolator(0, 255, 3000, true) // Caret's alpha goes from 0 to 255 in 1 second. Cycle.
+    : UIElement(parentContainer), m_threadPool(15)
   {
     // Create a monospace typeface
     // An alternative approach here is to ship a standard font for every/each platform
@@ -71,6 +70,18 @@ namespace varco {
       setViewportYOffset(value);
     });
     m_verticalScrollBar->setLineHeightPixels(m_characterHeightPixels);
+
+    // Create the caret's alpha interpolation sequence
+    // 1) Caret's alpha goes from 0 to 255 in 3 seconds
+    auto phase1 = std::make_unique<LinearInterpolator>(0, 255, 3000);
+    // 2) Caret stays the same for 2 seconds
+    auto phase2 = std::make_unique<ConstantInterpolator>(255, 3000);
+    // 3) Inverse of phase 1
+    auto phase3 = std::make_unique<LinearInterpolator>(255, 0, 3000);
+    m_caretInterpolatorSequence.addInterpolator(std::move(phase1));
+    m_caretInterpolatorSequence.addInterpolator(std::move(phase2));
+    m_caretInterpolatorSequence.addInterpolator(std::move(phase3));
+    m_caretInterpolatorSequence.start();
   }
 
   CodeView::~CodeView() {}
@@ -280,7 +291,7 @@ namespace varco {
     SkScalar lastViewVisibleLine = firstViewVisibleLine + (this->getRect(absoluteRect).height() / m_characterHeightPixels);
     if (cursorPos.y >= firstViewVisibleLine - 1 && cursorPos.y < lastViewVisibleLine + 1) {
       SkPaint caretPaint;
-      int val = m_caretInterpolator.getValue();
+      int val = m_caretInterpolatorSequence.getValue();
       caretPaint.setColor(SkColorSetARGB(255, val, val, val));
       caretPaint.setAntiAlias(true);
       SkScalar viewRelativeTopStart = (cursorPos.y - firstViewVisibleLine /* Line view-relative where the caret is at */) * m_characterHeightPixels;

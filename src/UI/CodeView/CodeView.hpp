@@ -66,7 +66,7 @@ namespace varco {
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
                                         // documents as soon as the first resize happens
 
-    LinearInterpolator m_caretInterpolator;
+    InterpolationSequence m_caretInterpolatorSequence;
 
     SkScalar m_currentYoffset = 0; // Y offset percentage in the current document (also the line we're at)
 
