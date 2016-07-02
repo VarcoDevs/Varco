@@ -12,8 +12,6 @@
 #include <string>
 #include <cctype>
 
-#include <iostream> // DEBUG
-
 namespace varco {
 
   // Events we'll be listening for
@@ -605,7 +603,7 @@ namespace varco {
 
             // Send "Finished"
             XEvent xevent;
-            memset (&xevent, 0, sizeof (xevent));
+            memset (&xevent, 0, sizeof(xevent));
             xevent.xany.type = ClientMessage;
             xevent.xany.display = this->fDisplay;
             xevent.xclient.window = ownerOfSelection;
@@ -622,7 +620,7 @@ namespace varco {
 
             // Reply to source with XDND ready
             XEvent xevent;
-            memset(&xevent, sizeof(xevent), 0);
+            memset(&xevent, 0, sizeof(xevent));
             xevent.xany.type = ClientMessage;
             xevent.xany.display = this->fDisplay;
             xevent.xclient.window = evt->xclient.data.l[0]; // source
