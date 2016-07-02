@@ -56,9 +56,8 @@ namespace varco {
      * ----------------------------------------- Bottom
      * (leading)
      *
-     * We're using Descent - Ascent + Leading given by getFontSpacing() to separate
-     * one line from the other (as a cell). But a character should be drawn from a
-     * baseline when drawText() is called, therefore we're also storing the Descent
+     * Notice thata character should be drawn from the baseline
+     * when drawText() is called, therefore we're also storing the Descent
      * in order to subtract it from the line spacing before rendering.
      *
      */
