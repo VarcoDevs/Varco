@@ -29,6 +29,7 @@ namespace varco {
     void loadDocument(Document& doc, SkScalar vScrollbarPos = 0);
     SkScalar getCharacterWidthPixels() const;
     SkScalar getCharacterHeightPixels() const;
+    SkPaint::FontMetrics getFontMetrics() const;
     bool isControlReady() const;
     bool isTrackingActive() const;
 
@@ -59,6 +60,7 @@ namespace varco {
     int m_textSize = 14;
 
     SkScalar m_characterWidthPixels, m_characterHeightPixels;
+    SkPaint::FontMetrics m_fontMetrics; // Font metrics for advanced rendering
     int m_wrapWidthInPixels = 0;
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
                                         // documents as soon as the first resize happens

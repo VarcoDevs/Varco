@@ -44,6 +44,25 @@ namespace varco {
     m_fontPaint.getTextWidths("A", 1, widths);
     m_characterWidthPixels = widths[0];
 
+    /*
+     * Here is how the font metrics work
+     *
+     * ----------------------------------------- Top
+     * _________________________________ Ascent
+     *               C
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Baseline
+     * _________________________________ Descent
+     *
+     * ----------------------------------------- Bottom
+     * (leading)
+     *
+     * We're using Descent - Ascent + Leading given by getFontSpacing() to separate
+     * one line from the other (as a cell). But a character should be drawn from a
+     * baseline when drawText() is called, therefore we're also storing the Descent
+     * in order to subtract it from the line spacing before rendering.
+     *
+     */
+    m_fontPaint.getFontMetrics(&m_fontMetrics);
     m_characterHeightPixels = m_fontPaint.getFontSpacing();
 
     // Create the vertical scrollbar
@@ -145,6 +164,10 @@ namespace varco {
 
   SkScalar CodeView::getCharacterHeightPixels() const {
     return m_characterHeightPixels;
+  }
+
+  SkPaint::FontMetrics CodeView::getFontMetrics() const {
+    return m_fontMetrics;
   }
 
   bool CodeView::isControlReady() const {

@@ -116,15 +116,15 @@ namespace varco {
       if (maxChars < 10)
         maxChars = 10; // Keep it to a minimum
 
+      const SkScalar fontDescent = m_codeView.getFontMetrics().fDescent; // Relative to baseline (see CodeView ctor)
+
       SkScalar bitmapEffectiveHeight = 0; // This is NOT know before the computation
       SkScalar bitmapEffectiveWidth = 0;
 
       struct {
         float x;
         float y;
-      } startpoint = { BITMAP_OFFSET_X, BITMAP_OFFSET_Y }; // Start point where to start rendering
-      startpoint.y += m_characterHeightPixels;  // Remember that a character is rendered starting from a
-                                                // left-BOTTOM coordinate for a monospace cell
+      } startpoint = { BITMAP_OFFSET_X, BITMAP_OFFSET_Y }; // Start point where to start rendering      
       bitmapEffectiveHeight += startpoint.y;
 
       SkBitmap bitmap; // Allocate partial rendering result (maximum size)
@@ -220,6 +220,10 @@ namespace varco {
 
       auto renderEditorLine = [&](EditorLine& el, size_t currentPhysicalLine, size_t physicalLineOffset)
       {
+        startpoint.y += m_characterHeightPixels;  // Do the carriage return here, reason: drawText works with
+                                                  // the left-BOTTOM corner of a cell
+        bitmapEffectiveHeight = startpoint.y;
+
         const size_t editorLineSize = el.m_characters.size();
 
         if (editorLineSize == 0) // Do not render empty lines
@@ -231,7 +235,7 @@ namespace varco {
             m_maximumCharactersLine = (int)editorLineSize;
         }
 
-        startpoint.x = BITMAP_OFFSET_X; // Reset the offset
+        startpoint.x = BITMAP_OFFSET_X; // Reset the offset        
 
         size_t charsRendered = 0;
         size_t absPosition = m_styleDb.m_absOffsetWhereLineBegins[currentPhysicalLine] + physicalLineOffset;
@@ -297,16 +301,15 @@ namespace varco {
                   nextPosToReach = std::min(editorLineSize, seg->absStartPos - absPosition);
                 }
               }
-                
             }
           }
 
           //
           // Finally draw the text
           //
-          std::string ts(el.m_characters.data() + charsRendered, nextPosToReach - charsRendered);
+          std::string ts(el.m_characters.data() + charsRendered, nextPosToReach - charsRendered);          
 
-          canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y, painter);
+          canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y - fontDescent, painter);
           charsRendered += ts.size();
           startpoint.x += m_characterWidthPixels * ts.size();
 
@@ -371,8 +374,8 @@ namespace varco {
             physicalLineOffset += el.m_characters.size();
 
             // Move the rendering cursor (carriage-return)
-            startpoint.y += m_characterHeightPixels;
-            bitmapEffectiveHeight += m_characterHeightPixels;
+            //startpoint.y += m_characterHeightPixels;
+            //bitmapEffectiveHeight += m_characterHeightPixels;
           }
 
           phLineVec.emplace_back(std::move(edLines));
@@ -387,8 +390,8 @@ namespace varco {
         }
 
         // Move the rendering cursor (carriage-return)
-        startpoint.y += m_characterHeightPixels;
-        bitmapEffectiveHeight += m_characterHeightPixels;
+        //startpoint.y += m_characterHeightPixels;
+        //bitmapEffectiveHeight += m_characterHeightPixels;
       }
 
       // Time to fulfill the promise
@@ -400,7 +403,7 @@ namespace varco {
           std::make_tuple<std::vector<PhysicalLine>, SkBitmap, SkScalar, SkScalar>(
             std::move(phLineVec), std::move(bitmap), std::move(bitmapEffectiveWidth), std::move(bitmapEffectiveHeight))
         );
-      }      
+      }
   }
 
 
@@ -490,7 +493,6 @@ namespace varco {
       background.setColor(SkColorSetARGB(255, 39, 40, 34));
       canvas.drawRect(bitmapRect, background);
     }
-
     
     
     SkScalar yOffset = 0;
@@ -498,19 +500,24 @@ namespace varco {
     for (auto& fut : m_futures) {
 
       auto data = std::move(fut.get());
-      SkBitmap partialBitmap = std::move(std::get<1>(data));
+      std::vector<PhysicalLine>& physLines = std::get<0>(data);
+      SkBitmap& partialBmp = std::get<1>(data);
+      SkScalar& partialBmpWidth = std::get<2>(data);
+      SkScalar& partialBmpHeight = std::get<3>(data);
 
-      m_numberOfEditorLines += (int)std::get<0>(data).size();
+      SkBitmap partialBitmap = std::move(partialBmp);
+
+      m_numberOfEditorLines += (int)physLines.size();
       
-      moveAppendVector<PhysicalLine>(m_physicalLines, std::get<0>(data));
+      moveAppendVector<PhysicalLine>(m_physicalLines, physLines);
       
       // Calculate source and destination rect
-      SkRect partialRect = SkRect::MakeLTRB(0, 0, std::get<2>(data), std::get<3>(data));
-      SkRect documentDestRect = SkRect::MakeLTRB(0, yOffset, std::get<2>(data), (yOffset + std::get<3>(data)));
+      SkRect partialRect = SkRect::MakeLTRB(0, 0, partialBmpWidth, partialBmpHeight);
+      SkRect documentDestRect = SkRect::MakeLTRB(0, yOffset, partialBmpWidth, (yOffset + partialBmpHeight));
 
       canvas.drawBitmapRect(partialBitmap, partialRect, documentDestRect, nullptr,
                             SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
-      yOffset += std::get<3>(data);
+      yOffset += partialBmpHeight;
     }
 
  

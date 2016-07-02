@@ -82,8 +82,8 @@ namespace varco {
     StyleDatabase m_styleDb;
 
     struct {
-      int x = 3;
-      int y = 29;
+      int x = 0;
+      int y = 47;
     } m_cursorPos; // Latest known cursor position
 
     void threadProcessChunk(size_t threadIdx);
