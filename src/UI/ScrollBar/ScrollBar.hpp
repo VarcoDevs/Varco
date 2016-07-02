@@ -29,7 +29,7 @@ namespace varco {
     void paint() override;
 
     void onLeftMouseDown(SkScalar x, SkScalar y);
-    void onLeftMouseMove(SkScalar x, SkScalar y);
+    void onMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
     void onMouseWheel(SkScalar x, SkScalar y, int direction);
 

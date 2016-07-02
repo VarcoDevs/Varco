@@ -5,6 +5,7 @@
 #include <UI/ScrollBar/ScrollBar.hpp>
 #include <Document/Document.hpp>
 #include <Utils/Concurrent.hpp>
+#include <Utils/Interpolators.hpp>
 #include <SkPaint.h>
 #include <memory>
 
@@ -35,7 +36,7 @@ namespace varco {
 
     // These might also forward the event to a scrollbar if present
     void onLeftMouseDown(SkScalar x, SkScalar y);
-    void onLeftMouseMove(SkScalar x, SkScalar y);
+    void onMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
     void onMouseWheel(SkScalar x, SkScalar y, int direction);
     
@@ -64,6 +65,8 @@ namespace varco {
     int m_wrapWidthInPixels = 0;
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
                                         // documents as soon as the first resize happens
+
+    LinearInterpolator m_caretInterpolator;
 
     SkScalar m_currentYoffset = 0; // Y offset percentage in the current document (also the line we're at)
 

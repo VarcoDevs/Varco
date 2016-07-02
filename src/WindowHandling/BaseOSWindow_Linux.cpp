@@ -399,8 +399,9 @@ namespace varco {
     XEvent evt;
     memset(&evt, 0, sizeof(evt));
     evt.type = Expose;
-    evt.xany.window = fWin;
+    evt.xexpose.window = fWin;
     XSendEvent(fDisplay, fWin, False, ExposureMask, &evt);
+    XFlush(fDisplay);
     //  }
     //lastExposeEventTime = std::chrono::system_clock::now();
   }
@@ -524,7 +525,7 @@ namespace varco {
 
     switch (evt->type) {
 
-      case Expose: {
+      case Expose: { // Paint event
 
         if (evt->xexpose.count == 0) { // Only handle the LAST expose redraw event
                                        // if there are multiple ones

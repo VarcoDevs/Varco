@@ -83,7 +83,7 @@ namespace varco {
 
     struct {
       int x = 0;
-      int y = 47;
+      int y = 0;
     } m_cursorPos; // Latest known cursor position
 
     void threadProcessChunk(size_t threadIdx);

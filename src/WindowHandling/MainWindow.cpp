@@ -81,7 +81,7 @@ namespace varco {
     else if (m_tabCtrl.isTrackingActive() == true)
       m_tabCtrl.stopTracking();
     else if (m_codeEditCtrl.isTrackingActive() || isPointInsideRect(x, y, m_codeEditCtrl.getRect()))
-      m_codeEditCtrl.onLeftMouseMove(x, y);
+      m_codeEditCtrl.onMouseMove(x, y);
 
     // [] Other controls' tests should go here
   }

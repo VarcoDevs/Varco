@@ -11,7 +11,8 @@ namespace varco {
 #define VSCROLLBAR_WIDTH 15
 
   CodeView::CodeView(UIElement<ui_container_tag>& parentContainer)
-    : UIElement(parentContainer), m_threadPool(15)
+    : UIElement(parentContainer), m_threadPool(15),
+      m_caretInterpolator(0, 255, 3000, true) // Caret's alpha goes from 0 to 255 in 1 second. Cycle.
   {
     // Create a monospace typeface
     // An alternative approach here is to ship a standard font for every/each platform
@@ -194,13 +195,13 @@ namespace varco {
     m_verticalScrollBar->onMouseWheel(x, y, direction);
   }
 
-  void CodeView::onLeftMouseMove(SkScalar x, SkScalar y) {
+  void CodeView::onMouseMove(SkScalar x, SkScalar y) {
     SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);
 
     if (m_verticalScrollBar && 
         (m_verticalScrollBar->isTrackingActive() || isPointInsideRect(relativeToParentCtrl.x(), relativeToParentCtrl.y(), 
                                                                       m_verticalScrollBar->getRect(relativeToParentRect))))
-      m_verticalScrollBar->onLeftMouseMove(relativeToParentCtrl.x(), relativeToParentCtrl.y());
+      m_verticalScrollBar->onMouseMove(relativeToParentCtrl.x(), relativeToParentCtrl.y());
   }
 
   void CodeView::onLeftMouseUp(SkScalar x, SkScalar y) {
@@ -268,9 +269,6 @@ namespace varco {
     canvas.drawBitmapRect(m_document->getBitmap(), bitmapPartialRect, myDestRect, nullptr,
                           SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
 
-
-    //canvas.drawBitmap(m_document->getBitmap(), 0, -documentYoffset);
-
     //////////////////////////////////////////////////////////////////////
     // Draw the cursor if in sight
     //////////////////////////////////////////////////////////////////////
@@ -281,19 +279,22 @@ namespace varco {
     SkScalar firstViewVisibleLine = this->m_currentYoffset;
     SkScalar lastViewVisibleLine = firstViewVisibleLine + (this->getRect(absoluteRect).height() / m_characterHeightPixels);
     if (cursorPos.y >= firstViewVisibleLine - 1 && cursorPos.y < lastViewVisibleLine + 1) {
-      SkPaint red;
-      red.setColor(SkColorSetARGB(255, 255, 0, 0));
+      SkPaint caretPaint;
+      int val = m_caretInterpolator.getValue();
+      caretPaint.setColor(SkColorSetARGB(255, val, val, val));
+      caretPaint.setAntiAlias(true);
       SkScalar viewRelativeTopStart = (cursorPos.y - firstViewVisibleLine /* Line view-relative where the caret is at */) * m_characterHeightPixels;
-      canvas.drawLine(cursorPos.x * m_characterWidthPixels + m_document->BITMAP_OFFSET_X,
+      canvas.drawLine(cursorPos.x * m_characterWidthPixels + Document::BITMAP_OFFSET_X,
                       viewRelativeTopStart,
-                      cursorPos.x * m_characterWidthPixels + m_document->BITMAP_OFFSET_X,
+                      cursorPos.x * m_characterWidthPixels + Document::BITMAP_OFFSET_X,
                       viewRelativeTopStart + m_characterHeightPixels /* Caret length */,
-                      red);
+                      caretPaint);
+      m_dirty = true;
     }
-    
 
     canvas.flush();
-
+    if (m_dirty == true)
+      m_parentContainer.repaint(); // Schedule a repaint
   }
 
   void CodeView::repaint() {

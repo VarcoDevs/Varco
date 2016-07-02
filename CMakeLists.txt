@@ -84,7 +84,8 @@ set (UTILS_SRCS
             src/Utils/Commons.hpp
             src/Utils/Utils.hpp
             src/Utils/VKeyCodes.hpp
-            src/Utils/Concurrent.hpp)
+            src/Utils/Concurrent.hpp
+            src/Utils/Interpolators.hpp)
 if (WIN32)
   list (APPEND UTILS_SRCS src/Utils/WGL.hpp
                           src/Utils/WGL.cpp)

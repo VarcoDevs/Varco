@@ -176,7 +176,7 @@ namespace varco {
   // point and scale it not according to the scrollbar area rectangle, but to the number of lines of the document
   // (at rect.y == 0 we're at line 0, at rect.y == max we're at line lastLine). Finally add this value to the
   // slider position that was stored before the tracking (so that we're not modifying its position)
-  void ScrollBar::onLeftMouseMove(SkScalar x, SkScalar y) {    
+  void ScrollBar::onMouseMove(SkScalar x, SkScalar y) {
     
     if (m_sliderIsBeingDragged == true) {
       SkPoint relativeToParentCtrl = SkPoint::Make(x - getRect(relativeToParentRect).fLeft, y - getRect(relativeToParentRect).fTop);      
