@@ -122,12 +122,14 @@ namespace varco {
       struct {
         float x;
         float y;
-      } startpoint = { 5, 20 }; // Start point where to start rendering
+      } startpoint = { BITMAP_OFFSET_X, BITMAP_OFFSET_Y }; // Start point where to start rendering
+      startpoint.y += m_characterHeightPixels;  // Remember that a character is rendered starting from a
+                                                // left-BOTTOM coordinate for a monospace cell
       bitmapEffectiveHeight += startpoint.y;
 
       SkBitmap bitmap; // Allocate partial rendering result (maximum size)
       bitmap.allocPixels(SkImageInfo::Make((int)(m_wrapWidthPixels + startpoint.x),
-        (int)((end - start) * MAX_WRAPS_PER_LINE * m_codeView.getCharacterHeightPixels()),
+        (int)((end - start) * MAX_WRAPS_PER_LINE * m_codeView.getCharacterHeightPixels() + startpoint.y),
         kN32_SkColorType, kPremul_SkAlphaType));
 
       bitmapEffectiveWidth = m_wrapWidthPixels + startpoint.x;
@@ -229,7 +231,7 @@ namespace varco {
             m_maximumCharactersLine = (int)editorLineSize;
         }
 
-        startpoint.x = 5.f;
+        startpoint.x = BITMAP_OFFSET_X; // Reset the offset
 
         size_t charsRendered = 0;
         size_t absPosition = m_styleDb.m_absOffsetWhereLineBegins[currentPhysicalLine] + physicalLineOffset;
@@ -504,11 +506,11 @@ namespace varco {
       
       // Calculate source and destination rect
       SkRect partialRect = SkRect::MakeLTRB(0, 0, std::get<2>(data), std::get<3>(data));
-      SkRect documentDestRect = SkRect::MakeLTRB(0, yOffset,
-        std::get<2>(data), (yOffset + std::get<3>(data)));
+      SkRect documentDestRect = SkRect::MakeLTRB(0, yOffset, std::get<2>(data), (yOffset + std::get<3>(data)));
 
-      canvas.drawBitmapRect(partialBitmap, partialRect, documentDestRect, nullptr, SkCanvas::SrcRectConstraint::kStrict_SrcRectConstraint);
-      yOffset += (size_t)std::get<3>(data);
+      canvas.drawBitmapRect(partialBitmap, partialRect, documentDestRect, nullptr,
+                            SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
+      yOffset += std::get<3>(data);
     }
 
  

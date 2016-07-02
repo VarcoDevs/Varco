@@ -60,6 +60,11 @@ namespace varco {
 
     void paint() override; // Renders the entire document on its bitmap
 
+    // The document is offset by these amounts when rendered to avoid
+    // having it too attached to the borders
+    static constexpr const float BITMAP_OFFSET_X = 5.f;
+    static constexpr const float BITMAP_OFFSET_Y = 0.f;
+
     CodeView& m_codeView;
     std::vector<std::string> m_plainTextLines;
     std::vector<PhysicalLine> m_physicalLines;
@@ -69,12 +74,17 @@ namespace varco {
     SkScalar m_characterHeightPixels;
     int m_wrapWidthPixels = -1;
     int m_numberOfEditorLines;
-    int m_maximumCharactersLine; // According to wrapWidth   
+    int m_maximumCharactersLine; // According to wrapWidth
 
     std::unique_ptr<LexerBase> m_lexer;
     bool m_needReLexing = false;
     bool m_firstDocumentRecalculate = true;
     StyleDatabase m_styleDb;
+
+    struct {
+      int x = 3;
+      int y = 29;
+    } m_cursorPos; // Latest known cursor position
 
     void threadProcessChunk(size_t threadIdx);
     std::mutex syncBarrier;

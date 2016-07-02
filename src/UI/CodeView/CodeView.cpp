@@ -206,8 +206,6 @@ namespace varco {
     SkCanvas canvas(this->m_bitmap);
     SkRect rect = getRect(absoluteRect); // Drawing is performed on the bitmap - absolute rect
 
-    canvas.save();
-
     //////////////////////////////////////////////////////////////////////
     // Draw the background of the control
     //////////////////////////////////////////////////////////////////////
@@ -238,31 +236,37 @@ namespace varco {
     m_document->paint();
 
     // Only draw things which intersect the current viewport region
-    /*SkScalar verticalScrollbarWidth = 0.f;
-    if (m_verticalScrollBar)
-      verticalScrollbarWidth = m_verticalScrollBar->getRect(absoluteRect).width();*/
-
     auto documentYoffset = m_currentYoffset * m_document->m_characterHeightPixels;
 
-    /*SkRect viewportRect = SkRect::MakeLTRB(getRect(absoluteRect).fLeft, getRect(absoluteRect).fTop,
-                                           getRect(absoluteRect).fRight - verticalScrollbarWidth, getRect(absoluteRect).fBottom);*/
+    // Calculate source and destination rect
+    SkRect bitmapPartialRect = SkRect::MakeLTRB(0, documentYoffset, this->getRect(absoluteRect).width(), documentYoffset + this->getRect(absoluteRect).height());
+    SkRect myDestRect = SkRect::MakeLTRB(0, 0, this->getRect(absoluteRect).width(), this->getRect(absoluteRect).height());
+
+    canvas.drawBitmapRect(m_document->getBitmap(), bitmapPartialRect, myDestRect, nullptr,
+                          SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
 
 
-    //canvas.clipRect(viewportRect, SkRegion::Op::kLastOp);
+    //canvas.drawBitmap(m_document->getBitmap(), 0, -documentYoffset);
 
+    //////////////////////////////////////////////////////////////////////
+    // Draw the cursor if in sight
+    //////////////////////////////////////////////////////////////////////
 
-    /*SkRect documentViewRect = SkRect::MakeLTRB(0.f, documentYoffset, std::min(viewportRect.width(), m_document->getRect(absoluteRect).width()),
-                                               std::min(documentYoffset + viewportRect.height(), m_document->getRect(absoluteRect).fBottom));*/
-    //viewportRect.fBottom = std::min(documentViewRect.height(), viewportRect.height());
+    auto cursorPos = m_document->m_cursorPos;
 
-   
-
-    // Start bitblitting from the current requested line position
-    //canvas.drawBitmapRect(m_document->getBitmap(), documentViewRect, viewportRect, nullptr);
-    //canvas.drawBitmapRect(m_document->getBitmap(), documentViewRect, nullptr);
-
-    
-    canvas.drawBitmap(m_document->getBitmap(), 0, -documentYoffset);
+    // Is the cursor in sight?
+    SkScalar firstViewVisibleLine = this->m_currentYoffset;
+    SkScalar lastViewVisibleLine = firstViewVisibleLine + (this->getRect(absoluteRect).height() / m_characterHeightPixels);
+    if (cursorPos.y >= firstViewVisibleLine - 1 && cursorPos.y < lastViewVisibleLine + 1) {
+      SkPaint red;
+      red.setColor(SkColorSetARGB(255, 255, 0, 0));
+      SkScalar viewRelativeTopStart = (cursorPos.y - firstViewVisibleLine /* Line view-relative where the caret is at */) * m_characterHeightPixels;
+      canvas.drawLine(cursorPos.x * m_characterWidthPixels + m_document->BITMAP_OFFSET_X,
+                      viewRelativeTopStart,
+                      cursorPos.x * m_characterWidthPixels + m_document->BITMAP_OFFSET_X,
+                      viewRelativeTopStart + m_characterHeightPixels /* Caret length */,
+                      red);
+    }
     
 
     canvas.flush();

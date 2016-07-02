@@ -188,7 +188,7 @@ namespace varco {
       auto delta = (relativeToParentCtrl.y() - m_mouseTrackingStartPoint.y());
       int y = static_cast<int>(delta * m_internalLineCount / (getRect(absoluteRect).height() - m_slider.m_length));
       m_value = clamp(m_mouseTrackingStartValue + y, 0.f, static_cast<SkScalar>(m_maximum));
-      m_sliderChangeCallback((m_value / static_cast<SkScalar>(m_maximum)) * (m_internalLineCount - 1)); // Signal to the parent that slider has changed
+      m_sliderChangeCallback((m_value / m_maximum) * m_internalLineCount); // Signal to the parent that slider has changed
     }
 
     m_dirty = true;

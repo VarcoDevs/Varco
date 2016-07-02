@@ -18,7 +18,8 @@ namespace varco {
 
   private:
     CodeView& m_codeEditCtrl;
-    TabBar& m_tabCtrl;
+    TabBar& m_tabCtrl;    
+
     // A map that stores the association between a tab and a document
     std::map<int, std::unique_ptr<Document>> m_tabDocumentMap;
     // A map that stores the vertical scrollbar position for each document (to remember it)

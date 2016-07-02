@@ -42,10 +42,10 @@ namespace varco {
 
   private:
     friend class DocumentManager;
-    friend class Document;    
+    friend class Document;
 
     Document *m_document = nullptr;
-    std::unique_ptr<ScrollBar> m_verticalScrollBar;
+    std::unique_ptr<ScrollBar> m_verticalScrollBar;    
 
     inline void setVScrollbarValue(SkScalar value) {
       m_verticalScrollBar->m_value = value;
@@ -63,7 +63,7 @@ namespace varco {
     bool m_codeViewInitialized = false; // This control is initialized and ready to render
                                         // documents as soon as the first resize happens
 
-    SkScalar m_currentYoffset = 0; // Y offset percentage in the current document
+    SkScalar m_currentYoffset = 0; // Y offset percentage in the current document (also the line we're at)
 
     ThreadPool m_threadPool;
   };

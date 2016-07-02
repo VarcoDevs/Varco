@@ -39,12 +39,12 @@ namespace varco {
                       m_tabCtrl.getRect().top());
 
     // Calculate CodeView region in the remaining space
-    SkRect codeEditCtrlRect = SkRect::MakeLTRB(0, 33.0f, (SkScalar)this->Width, (SkScalar)this->Height);
-    // Draw the TabBar region if needed
+    SkRect codeEditCtrlRect = SkRect::MakeLTRB(0, 0, (SkScalar)this->Width, (SkScalar)this->Height - 33.0f);
+    // Draw the CodeView region if needed
     m_codeEditCtrl.resize(codeEditCtrlRect);
     m_codeEditCtrl.paint();
-    canvas.drawBitmap(m_codeEditCtrl.getBitmap(), m_codeEditCtrl.getRect().left(), 
-                      m_codeEditCtrl.getRect().top());
+    canvas.drawBitmap(m_codeEditCtrl.getBitmap(), 0, 33.0f);
+
   }
 
   void MainWindow::onLeftMouseDown(SkScalar x, SkScalar y) {
