@@ -21,7 +21,7 @@ namespace varco {
     ~CodeView();
 
     void resize(SkRect rect) override;
-    void paint() override;
+    void paint(SkCanvas& canvas) override;
     void repaint() override;
 
     void startMouseCapture() override;

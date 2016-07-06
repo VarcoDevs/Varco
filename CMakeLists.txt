@@ -17,6 +17,9 @@ list (APPEND LIBS ${OPENGL_LIBRARIES})
 
 add_subdirectory (deps/glfw)
 
+list (APPEND INCLUDES 
+            deps/glfw/include)
+
 ######################################## End GLFW dependency ##########################################
 
 ########################################### Skia dependency ###########################################
@@ -122,7 +125,7 @@ list (APPEND INCLUDES ${CMAKE_BINARY_DIR}/Configuration)
 # Main Varco project definition and its dependency projects
 add_executable (varco ${SRCS})
 target_include_directories (varco PUBLIC ${INCLUDES})
-target_link_libraries (varco skia)
+target_link_libraries (varco skia glfw)
 
 if (UNIX)
   #X11 specifies a different default order for RGBA samples (BGRA)

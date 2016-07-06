@@ -644,7 +644,7 @@ namespace varco {
     //		//cout << "Done in " << sec << " seconds / " << msec << " milliseconds";
   }
 
-  void Document::paint() {
+  void Document::paint(SkCanvas& canvas) {
     if (!m_dirty)
       return;
 

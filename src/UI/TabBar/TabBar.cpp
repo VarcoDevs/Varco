@@ -217,23 +217,9 @@ namespace varco {
     return false;
   }
 
-  void TabBar::paint() {
+  void TabBar::paint(SkCanvas& canvas) {
 
-    if (!m_dirty)
-      return;
-
-    m_dirty = false; // It will be false at the end of this function, unless overridden
-
-    SkCanvas canvas(m_bitmap);
-
-    canvas.save();
-
-    // The following is no longer necessary due to drawing into different bitmap buffers
-    //canvas->clipRect(this->m_rect); // Clip to control m_rect, this helps preventing overflowing
-                                    // drawings when using antialiasing and other hard-to-control
-                                    // drawing techniques
-
-    SkRect rect = getRect(absoluteRect); // Drawing is performed on the bitmap - absolute rect
+    SkRect rect = getRect(relativeToParentRect); // Drawing is performed directly on the canvas - relative rect
 
     //////////////////////////////////////////////////////////////////////
     // Draw the background of the control
@@ -321,12 +307,6 @@ namespace varco {
       selectedTabOffset = rect.fLeft + tabs[selectedTabIndex].getOffset() + movementOrTrackingOffset;
       canvas.drawBitmap(tabs[selectedTabIndex].getBitmap(), selectedTabOffset, rect.fTop);
     }
-
-    canvas.flush();
-    canvas.restore();
-
-    if (m_dirty == true)
-      m_parentContainer.repaint(); // Schedule a repaint
   }
 
   void TabBar::swapTabs(int tab1, int tab2) {
@@ -402,20 +382,20 @@ namespace varco {
       }
     }
 
-    if (redrawNeeded) {
-      this->m_dirty = true;
-      m_parentContainer.repaint();
-    }
+//    if (redrawNeeded) {
+//      this->m_dirty = true;
+//      m_parentContainer.repaint();
+//    }
   }
 
-  void TabBar::onLeftMouseMove(SkScalar x, SkScalar y) {
+  void TabBar::onMouseMove(SkScalar x, SkScalar y) {
     if (!m_tracking)
       return;
 
     tabs[selectedTabIndex].trackingOffset = x - m_startXTrackingPosition;
     tabs[selectedTabIndex].dirty = true;
-    m_dirty = true;
-    m_parentContainer.repaint();
+    // m_dirty = true;
+    // m_parentContainer.repaint();
   }
 
   void TabBar::onLeftMouseUp(SkScalar x, SkScalar y) {
@@ -450,7 +430,7 @@ namespace varco {
       selectedTabIndex = static_cast<int>(tabs.size() - 1);
     }
 
-    this->m_parentContainer.repaint();
+    // this->m_parentContainer.repaint();
 
     return newTabId;
   }
@@ -470,9 +450,9 @@ namespace varco {
     tabs[selectedTabIndex].trackingOffset = 0.0f;
 
     tabs[selectedTabIndex].dirty = true;
-    m_dirty = true;
-    m_parentContainer.stopMouseCapture();
-    m_parentContainer.repaint();
+//    m_dirty = true;
+//    m_parentContainer.stopMouseCapture();
+//    m_parentContainer.repaint();
   }
 
 }

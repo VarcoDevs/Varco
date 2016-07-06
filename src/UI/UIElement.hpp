@@ -1,6 +1,7 @@
 #ifndef VARCO_UIELEMENT_HPP
 #define VARCO_UIELEMENT_HPP
 
+#include <SkCanvas.h>
 #include <SkBitmap.h>
 
 namespace varco {
@@ -45,18 +46,19 @@ namespace varco {
     using tag_control = ui_container_tag;
 
     virtual void resize(SkRect rect /* relative to parent */) {
-      if (m_rect != rect && rect.fTop < rect.fBottom && rect.fLeft < rect.fRight) {
-        m_rect = rect;
+//      if (m_rect != rect && rect.fTop < rect.fBottom && rect.fLeft < rect.fRight) {
+//        m_rect = rect;
 
-        // This adjustment is necessary since the control needs not to know anything about its
-        // relative position on its parent. It always starts drawing its bitmap at top-left 0;0
-        m_bitmap.allocPixels(SkImageInfo::Make((int)(m_rect.fRight - m_rect.fLeft),
-          (int)(m_rect.fBottom - m_rect.fTop), kN32_SkColorType, kPremul_SkAlphaType));
-        m_dirty = true;
-      }
+//        // This adjustment is necessary since the control needs not to know anything about its
+//        // relative position on its parent. It always starts drawing its bitmap at top-left 0;0
+//        m_bitmap.allocPixels(SkImageInfo::Make((int)(m_rect.fRight - m_rect.fLeft),
+//          (int)(m_rect.fBottom - m_rect.fTop), kN32_SkColorType, kPremul_SkAlphaType));
+//        m_dirty = true;
+//      }
+      m_rect = rect;
     }
 
-    virtual void paint() = 0;
+    virtual void paint(SkCanvas& canvas) = 0;
 
     SkBitmap& getBitmap() {
       return m_bitmap;

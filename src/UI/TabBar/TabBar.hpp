@@ -90,9 +90,9 @@ namespace varco {
     TabBar(UIElement<ui_container_tag>& parentWindow);
     
     void resize(SkRect rect) override; // Set the new rect where the control will redraw itself    
-    void paint() override; // Paint the control in the bitmap
+    void paint(SkCanvas& canvas) override; // Paint the control in the bitmap
     void onLeftMouseDown(SkScalar x, SkScalar y);
-    void onLeftMouseMove(SkScalar x, SkScalar y);
+    void onMouseMove(SkScalar x, SkScalar y);
     void onLeftMouseUp(SkScalar x, SkScalar y);
     // Adds a new tab and returns a unique identifier
     int addNewTab(std::string title, bool makeSelected = true);

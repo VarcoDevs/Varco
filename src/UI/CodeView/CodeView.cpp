@@ -166,7 +166,7 @@ namespace varco {
     //  m_verticalScrollBar->setSliderPosition(0);
 
     m_dirty = true;
-    paint(); // Trigger a cache invalidation for the viewport (necessary)
+    //paint(); // Trigger a cache invalidation for the viewport (necessary)
   }
 
   SkScalar CodeView::getCharacterWidthPixels() const {
@@ -230,15 +230,15 @@ namespace varco {
     m_parentContainer.repaint();
   }
 
-  void CodeView::paint() {
+  void CodeView::paint(SkCanvas& canvas) {
 
-    if (!m_dirty)
-      return;
+//    if (!m_dirty)
+//      return;
 
-    m_dirty = false; // It will be false at the end of this function, unless overridden
+//    m_dirty = false; // It will be false at the end of this function, unless overridden
 
-    SkCanvas canvas(this->m_bitmap);
-    SkRect rect = getRect(absoluteRect); // Drawing is performed on the bitmap - absolute rect
+//    SkCanvas canvas(this->m_bitmap);
+    SkRect rect = getRect(relativeToParentRect); // Drawing is performed directly on the canvas - relative rect
 
     //////////////////////////////////////////////////////////////////////
     // Draw the background of the control
@@ -248,63 +248,63 @@ namespace varco {
       background.setColor(SkColorSetARGB(255, 39, 40, 34));
       canvas.drawRect(rect, background);
     }
-
+return;
     //////////////////////////////////////////////////////////////////////
     // Draw the vertical scrollbar
     //////////////////////////////////////////////////////////////////////
     {
       if (m_verticalScrollBar) {
-        m_verticalScrollBar->paint();
-        canvas.drawBitmap(m_verticalScrollBar->getBitmap(), m_verticalScrollBar->getRect(relativeToParentRect).fLeft,
-                          m_verticalScrollBar->getRect(relativeToParentRect).fTop);
+        m_verticalScrollBar->paint(canvas);
+        //canvas.drawBitmap(m_verticalScrollBar->getBitmap(), m_verticalScrollBar->getRect(relativeToParentRect).fLeft,
+        //                  m_verticalScrollBar->getRect(relativeToParentRect).fTop);
       }
     }
 
     if (m_document == nullptr)
       return; // Nothing to display
 
-    //////////////////////////////////////////////////////////////////////
-    // Render and draw the requested portion of the document
-    //////////////////////////////////////////////////////////////////////
+//    //////////////////////////////////////////////////////////////////////
+//    // Render and draw the requested portion of the document
+//    //////////////////////////////////////////////////////////////////////
 
-    m_document->paint();
+//    m_document->paint();
 
-    // Only draw things which intersect the current viewport region
-    auto documentYoffset = m_currentYoffset * m_document->m_characterHeightPixels;
+//    // Only draw things which intersect the current viewport region
+//    auto documentYoffset = m_currentYoffset * m_document->m_characterHeightPixels;
 
-    // Calculate source and destination rect
-    SkRect bitmapPartialRect = SkRect::MakeLTRB(0, documentYoffset, this->getRect(absoluteRect).width(), documentYoffset + this->getRect(absoluteRect).height());
-    SkRect myDestRect = SkRect::MakeLTRB(0, 0, this->getRect(absoluteRect).width(), this->getRect(absoluteRect).height());
+//    // Calculate source and destination rect
+//    SkRect bitmapPartialRect = SkRect::MakeLTRB(0, documentYoffset, this->getRect(absoluteRect).width(), documentYoffset + this->getRect(absoluteRect).height());
+//    SkRect myDestRect = SkRect::MakeLTRB(0, 0, this->getRect(absoluteRect).width(), this->getRect(absoluteRect).height());
 
-    canvas.drawBitmapRect(m_document->getBitmap(), bitmapPartialRect, myDestRect, nullptr,
-                          SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
+//    canvas.drawBitmapRect(m_document->getBitmap(), bitmapPartialRect, myDestRect, nullptr,
+//                          SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
 
-    //////////////////////////////////////////////////////////////////////
-    // Draw the cursor if in sight
-    //////////////////////////////////////////////////////////////////////
+//    //////////////////////////////////////////////////////////////////////
+//    // Draw the cursor if in sight
+//    //////////////////////////////////////////////////////////////////////
 
-    auto cursorPos = m_document->m_cursorPos;
+//    auto cursorPos = m_document->m_cursorPos;
 
-    // Is the cursor in sight?
-    SkScalar firstViewVisibleLine = this->m_currentYoffset;
-    SkScalar lastViewVisibleLine = firstViewVisibleLine + (this->getRect(absoluteRect).height() / m_characterHeightPixels);
-    if (cursorPos.y >= firstViewVisibleLine - 1 && cursorPos.y < lastViewVisibleLine + 1) {
-      SkPaint caretPaint;
-      int val = m_caretInterpolatorSequence.getValue();
-      caretPaint.setColor(SkColorSetARGB(255, val, val, val));
-      caretPaint.setAntiAlias(true);
-      SkScalar viewRelativeTopStart = (cursorPos.y - firstViewVisibleLine /* Line view-relative where the caret is at */) * m_characterHeightPixels;
-      canvas.drawLine(cursorPos.x * m_characterWidthPixels + Document::BITMAP_OFFSET_X,
-                      viewRelativeTopStart,
-                      cursorPos.x * m_characterWidthPixels + Document::BITMAP_OFFSET_X,
-                      viewRelativeTopStart + m_characterHeightPixels /* Caret length */,
-                      caretPaint);
-      m_dirty = true;
-    }
+//    // Is the cursor in sight?
+//    SkScalar firstViewVisibleLine = this->m_currentYoffset;
+//    SkScalar lastViewVisibleLine = firstViewVisibleLine + (this->getRect(absoluteRect).height() / m_characterHeightPixels);
+//    if (cursorPos.y >= firstViewVisibleLine - 1 && cursorPos.y < lastViewVisibleLine + 1) {
+//      SkPaint caretPaint;
+//      int val = m_caretInterpolatorSequence.getValue();
+//      caretPaint.setColor(SkColorSetARGB(255, val, val, val));
+//      caretPaint.setAntiAlias(true);
+//      SkScalar viewRelativeTopStart = (cursorPos.y - firstViewVisibleLine /* Line view-relative where the caret is at */) * m_characterHeightPixels;
+//      canvas.drawLine(cursorPos.x * m_characterWidthPixels + Document::BITMAP_OFFSET_X,
+//                      viewRelativeTopStart,
+//                      cursorPos.x * m_characterWidthPixels + Document::BITMAP_OFFSET_X,
+//                      viewRelativeTopStart + m_characterHeightPixels /* Caret length */,
+//                      caretPaint);
+//      m_dirty = true;
+//    }
 
-    canvas.flush();
-    if (m_dirty == true)
-      m_parentContainer.repaint(); // Schedule a repaint
+//    canvas.flush();
+//    if (m_dirty == true)
+//      m_parentContainer.repaint(); // Schedule a repaint
   }
 
   void CodeView::repaint() {

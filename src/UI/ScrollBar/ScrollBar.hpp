@@ -26,7 +26,7 @@ namespace varco {
   public:
     ScrollBar(UIElement<ui_container_tag, ui_control_tag>& codeView, std::function<void(SkScalar)> sliderChangeCallback);
 
-    void paint() override;
+    void paint(SkCanvas& canvas) override;
 
     void onLeftMouseDown(SkScalar x, SkScalar y);
     void onMouseMove(SkScalar x, SkScalar y);

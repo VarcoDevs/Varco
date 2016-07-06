@@ -58,7 +58,7 @@ namespace varco {
     void setWrapWidthInPixels(int width);    
     void recalculateDocumentLines();
 
-    void paint() override; // Renders the entire document on its bitmap
+    void paint(SkCanvas& canvas) override; // Renders the entire document on its bitmap
 
     // The document is offset by these amounts when rendered to avoid
     // having it too attached to the borders

@@ -48,14 +48,14 @@ namespace varco {
 
   // The fundamental equation to repaint the scrollbar is:
   //  slider_length = maximum_slider_height * (how_many_lines_I_can_display_in_the_view / total_number_of_lines_in_the_document)
-  void ScrollBar::paint() {
+  void ScrollBar::paint(SkCanvas& canvas) {
 
-    if (!m_dirty)
-      return;
+//    if (!m_dirty)
+//      return;
 
-    m_dirty = false; // It will be false at the end of this function, unless overridden
+//    m_dirty = false; // It will be false at the end of this function, unless overridden
 
-    SkCanvas canvas(this->m_bitmap);
+//    SkCanvas canvas(this->m_bitmap);
 
     //////////////////////////////////////////////////////////////////////
     // Draw the background of the bar (alpha only)
@@ -66,7 +66,7 @@ namespace varco {
     //    Calculate the position, length and drawing area for the slider
     // --------------------------------------------------------------------  <<
 
-    SkRect scrollbarRect = this->getRect(absoluteRect);
+    SkRect scrollbarRect = this->getRect(relativeToParentRect);
 
     // extraBottomLines are virtual lines to let the last line of text be scrollable till it is left as the only one above in the view.
     // Thus they correspond to the maximum number of lines that the view can visualize - 1 (the one I want is excluded)
@@ -90,14 +90,14 @@ namespace varco {
       m_slider.m_length = 15.f;
 
     // This is finally the drawing area for the slider (store it for hit tests)
-    m_slider.m_rect = SkRect::MakeLTRB(0.f, scrollbarRect.fTop + rectAbsPos, scrollbarRect.width() - 1.f, 
+    m_slider.m_rect = SkRect::MakeLTRB(scrollbarRect.fLeft, scrollbarRect.fTop + rectAbsPos, scrollbarRect.fLeft + scrollbarRect.width() - 1.f,
                                        scrollbarRect.fTop + rectAbsPos + m_slider.m_length);
 
     // A separation line of 1 px
     {
       SkPaint line;
       line.setColor(SkColorSetARGB(255, 29, 29, 29));
-      line.setStrokeWidth(1.0);      
+      line.setStrokeWidth(1.0);
       canvas.drawLine(scrollbarRect.fLeft + 1.f, scrollbarRect.fTop, scrollbarRect.fLeft + 1.f,
                       scrollbarRect.fBottom, line);
     }
@@ -148,7 +148,7 @@ namespace varco {
 
     canvas.drawPath(m_slider.m_path, fillGradient);
 
-    canvas.flush();
+//    canvas.flush();
   }
 
   void ScrollBar::onLeftMouseDown(SkScalar x, SkScalar y) {
