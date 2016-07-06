@@ -13,6 +13,12 @@ set (LIBS)
 find_package (OpenGL REQUIRED)
 list (APPEND LIBS ${OPENGL_LIBRARIES})
 
+########################################## GLFW dependency ############################################
+
+add_subdirectory (deps/glfw)
+
+######################################## End GLFW dependency ##########################################
+
 ########################################### Skia dependency ###########################################
 
 # No gpu log calls in debug
