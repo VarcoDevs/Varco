@@ -1,3 +1,7 @@
 [submodule "deps/skia"]
 	path = deps/skia
 	url = https://github.com/VarcoDevs/skia
+
+[submodule "deps/glfw"]
+    path = deps/glfw
+    url = https://github.com/glfw/glfw
