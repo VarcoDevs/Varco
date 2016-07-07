@@ -13,16 +13,6 @@ set (LIBS)
 find_package (OpenGL REQUIRED)
 list (APPEND LIBS ${OPENGL_LIBRARIES})
 
-########################################### Zlib dependency ###########################################
-
-add_subdirectory(deps/zlib)
-
-set(ZLIB_INCLUDE_DIRS  "${CMAKE_SOURCE_DIR}/deps/zlib;${CMAKE_BINARY_DIR}/deps/zlib")
-set(ZLIB_LIBRARIES "zlibstatic")
-set(ZLIB_FOUND true)
-
-######################################## End Zlib dependency ##########################################
-
 ########################################### Skia dependency ###########################################
 
 # No gpu log calls in debug
