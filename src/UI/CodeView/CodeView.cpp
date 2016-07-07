@@ -125,8 +125,10 @@ namespace varco {
     // Calculate new wrap width (allow space for the vertical scrollbar if present)
     auto newWrapWidth = static_cast<int>(m_rect.width() - (m_verticalScrollBar ? (VSCROLLBAR_WIDTH * 2) : 0));
     m_document->setWrapWidthInPixels(newWrapWidth);
-    // Calculate the new document size
-    m_document->recalculateDocumentLines();
+    // Important: do NOT recalculate document lines here! Reason being: document recalculations are to be performed
+    // by the rendering thread. Modifying the wrap width and resizing the document is sufficient to trigger a complete
+    // recalculation next time it will be rendered.
+    // NOPE: m_document->recalculateDocumentLines();
 
     // Resize the document bitmap to fit the new render that will take place
     SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInPixels * getCharacterWidthPixels() + 5.f,
@@ -141,32 +143,9 @@ namespace varco {
     setVScrollbarValue(vScrollbarPos);
     setViewportYOffset(vScrollbarPos); // And obviously also set our viewport Y offset
 
-    //// Set a new pixmap for rendering this document ~ caveat: this is NOT the viewport dimension
-    //// since everything needs to be rendered, not just the viewport region
-    //m_documentPixmap = std::make_unique<QImage>(viewport()->width(), m_document->m_numberOfEditorLines *
-    //  fontMetrics().height() + 20 /* Remember to compensate the offset */,
-    //  QImage::Format_ARGB32_Premultiplied);
-    //m_documentMutex.unlock();
-
-    //m_messageQueueMutex.lock();
-    //m_documentUpdateMessages.emplace_back(viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
-    //  fontMetrics().height() + 20 /* Remember to compensate the offset */);
-    //m_messageQueueMutex.unlock();
-
-    //if (m_renderingThread->isRunning() == false)
-    //  m_renderingThread->start();
-
-    //  QSizeF newSize;
-    //  newSize.setHeight( m_document->m_numberOfEditorLines );
-    //  newSize.setWidth ( m_document->m_maximumCharactersLine );
-
-    //  // Emit a documentSizeChanged signal. This will trigger scrollbars resizing
-    //  emit documentSizeChanged( newSize, fontMetrics().height() );
-
-    //  m_verticalScrollBar->setSliderPosition(0);
-
     m_dirty = true;
-    paint(); // Trigger a cache invalidation for the viewport (necessary)
+
+    m_parentContainer.repaint(); // Trigger a complete repaint
   }
 
   SkScalar CodeView::getCharacterWidthPixels() const {

@@ -1,3 +1,6 @@
 [submodule "deps/skia"]
 	path = deps/skia
 	url = https://github.com/VarcoDevs/skia
+[submodule "deps/zlib"]
+	path = deps/zlib
+	url = https://github.com/madler/zlib.git

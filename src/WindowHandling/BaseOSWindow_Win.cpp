@@ -288,7 +288,9 @@ namespace varco {
 
         // Hack: this will lock handling sizing events until the rendering thread has finished
         // processing one rendering step forcing resizing and rendering to proceed in lock-steps
-        std::unique_lock<std::mutex> lk(renderMutex);        
+        {
+          std::unique_lock<std::mutex> lk(renderMutex);
+        }
       } break;
 
       case WM_SIZE: {
@@ -296,8 +298,10 @@ namespace varco {
         auto height = HIWORD(lParam);
         this->resize(width, height);
 
-        std::unique_lock<std::mutex> lk(renderMutex);
-        redrawNeeded = true;
+		    {
+		      std::unique_lock<std::mutex> lk(renderMutex);
+		      redrawNeeded = true;
+		    }
         renderCV.notify_one();
 
         return 0;
@@ -305,8 +309,10 @@ namespace varco {
 
       case WM_PAINT: {
 
-        std::unique_lock<std::mutex> lk(renderMutex);
-        redrawNeeded = true;
+		    {
+		      std::unique_lock<std::mutex> lk(renderMutex);
+		      redrawNeeded = true;
+		    }
         renderCV.notify_one();
 
         return 0; // Completely handled
@@ -335,7 +341,14 @@ namespace varco {
   }
 
   void BaseOSWindow::repaint() {
-    InvalidateRect(this->hWnd, nullptr, FALSE); // Send a WM_PAINT
+
+    if (std::this_thread::get_id() == renderThread.get_id())
+      redrawNeeded = true; // Repaint() gets called by the rendering thread, therefore there is no need
+                           // for a mutex acquire or WM_PAINT sending
+    else { 
+      // Repaint initiated by an external non-rendering thread
+      InvalidateRect(this->hWnd, nullptr, FALSE); // Send a WM_PAINT
+    }
   }
 
   void BaseOSWindow::renderThreadFn() {
@@ -384,6 +397,7 @@ namespace varco {
         // Area has been changed, we're resizing
         resizing = true;
       }
+
 
       HDC dc = GetDC((HWND)hWnd);
       auto res = wglMakeCurrent(dc, (HGLRC)fHGLRC);

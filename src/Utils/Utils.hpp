@@ -16,7 +16,8 @@ namespace varco {
   template<typename T>
   constexpr const T& clamp(const T& val, const T& lo, const T& hi) {
     return (val < lo) ? lo : (hi < val) ? hi : val;
-  }  
+  }
+
 }
 
 #endif // VARCO_UTILS_HPP

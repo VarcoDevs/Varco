@@ -453,27 +453,43 @@ namespace varco {
       break;
     }
 
-    m_numThreads = numThreads;
-    m_partials.clear();
-    m_futures.clear();
-    m_partials.resize(numThreads);
-    m_futures.reserve(numThreads);
-    for (size_t i = 0; i < numThreads; ++i)
-      m_futures.emplace_back(m_partials[i].get_future());
-
+    {
+      std::unique_lock<std::mutex> lock(syncBarrier);
+      m_numThreads = numThreads;
+      m_partials.clear();
+      m_futures.clear();
+      m_partials.resize(numThreads);
+      m_futures.reserve(numThreads);
+      for (size_t i = 0; i < numThreads; ++i)
+        m_futures.emplace_back(m_partials[i].get_future());
+    }
     
     m_totalBitmapHeight = 0;
     m_maxBitmapWidth = 0;
     m_maximumCharactersLine = 0;
 
+    // Set threads callback (the work function) and the condition variable to wake us up when the rendering is done
     m_codeView.m_threadPool.setCallback(std::bind(&Document::threadProcessChunk, this, std::placeholders::_1));
-
+    std::mutex waitWorkMutex;
+    std::condition_variable allWorkFinishedCV;
+    m_codeView.m_threadPool.setFinishedCV(&allWorkFinishedCV);
 
     m_codeView.m_threadPool.dispatch();
 
+    // Wait for the threadpool to finish
+    {
+      std::unique_lock<std::mutex> lock(waitWorkMutex);
+      while (m_codeView.m_threadPool.idle() == false) { // Safeguard against spurious wakeups
+        allWorkFinishedCV.wait(lock);
+      }
+    }
     
-    for (auto& el : m_futures) { // Wait for the threads to finish and collect futures
-      el.wait();
+    // All threads have signalled their 'idle' status, but futures might not have been set yet
+    {
+      std::unique_lock<std::mutex> lock(syncBarrier);
+      for (auto& el : m_futures) { // Wait for futures collection (must all become valid)
+        el.wait();
+      }
     }
 
     // Resize the document bitmap to fit the new render that will take place

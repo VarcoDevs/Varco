@@ -174,6 +174,7 @@ namespace varco {
       m_workloadReady.resize(m_NThreads, false);
       for(size_t i = 0; i < m_NThreads; ++i)
         m_threads.emplace_back(&ThreadPool::threadMain, this, i);
+      m_threadsIdle = m_NThreads;
     }
     ~ThreadPool() {
       m_sigterm = true;
@@ -183,16 +184,31 @@ namespace varco {
           thread.join();
       }
     }
+    void setFinishedCV(std::condition_variable *cv) {
+      m_allWorkFinishedCV = cv;
+    }
     void setCallback(std::function<void(size_t)> callback) {
       m_callback = callback;
     }
     void dispatch() {
-      std::fill(m_workloadReady.begin(), m_workloadReady.end(), true);
-      m_workloadReady.resize(m_NThreads, true);
+	    {
+		    std::unique_lock<std::mutex> lock(m_mutex);
+		    std::fill(m_workloadReady.begin(), m_workloadReady.end(), true);
+		    m_workloadReady.resize(m_NThreads, true);
+        m_threadsIdle = 0;
+	    }
       m_cv.notify_all();
     }
+    bool idle() {
+      bool result = false;
+      {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        result = (m_threadsIdle == m_NThreads);
+      }
+      return result;
+    }
 
-    const size_t m_NThreads;
+    const size_t m_NThreads; // Number of threads of the threadpool
 
   private:
     void threadMain(size_t threadIdx) {
@@ -211,16 +227,22 @@ namespace varco {
         {
           std::unique_lock<std::mutex> lock(m_mutex);
           m_workloadReady[threadIdx] = false;
+          ++m_threadsIdle;
+          if (m_threadsIdle == m_NThreads)
+            m_allWorkFinishedCV->notify_all(); // Signal ThreadPool owner we're done
         }
       }
     }
 
     std::vector<std::thread> m_threads;
+    size_t m_threadsIdle;
     bool m_sigterm = false;
     std::vector<bool> m_workloadReady;
     std::mutex m_mutex;
     std::condition_variable m_cv;
     std::function<void(size_t)> m_callback;
+    // A condition variable to signal all work has been done
+    std::condition_variable *m_allWorkFinishedCV;
   };
 
 }
