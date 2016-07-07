@@ -131,8 +131,8 @@ namespace varco {
     // NOPE: m_document->recalculateDocumentLines();
 
     // Resize the document bitmap to fit the new render that will take place
-    SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInPixels * getCharacterWidthPixels() + 5.f,
-                                      m_document->m_numberOfEditorLines * getCharacterHeightPixels() + 20.f);
+    SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInPixels + Document::BITMAP_OFFSET_X,
+                                      m_document->m_numberOfEditorLines * getCharacterHeightPixels() + Document::BITMAP_OFFSET_Y);
     m_document->resize(newRect);
 
     // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
