@@ -635,10 +635,6 @@ namespace varco {
       this->m_characterWidthPixels = request->m_characterWidthPixels;
       this->m_characterHeightPixels = request->m_characterHeightPixels;
       this->m_maximumCharactersLine = request->m_maximumCharactersLine;
-    
-      // This adjustment is necessary since the control needs not to know anything about its
-      // relative position on its parent. It always starts drawing its bitmap at top-left 0;0
-      //this->m_offscreenBuffer.allocPixels(SkImageInfo::Make((int)(bitmapRect.fRight - bitmapRect.fLeft),
 
       this->resize(bitmapRect);
 
