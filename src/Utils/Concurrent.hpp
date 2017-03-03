@@ -1,9 +1,12 @@
 #ifndef VARCO_CONCURRENT_HPP
 #define VARCO_CONCURRENT_HPP
 
+#include <Document/Document.hpp>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 #include <thread>
+#include <memory>
 #include <type_traits>
 #include <tuple>
 #include <functional>
@@ -12,6 +15,67 @@
 #include <map>
 
 namespace varco {
+
+  // Two classes help to organize a document to be displayed and are set up by a document
+  // recalculate operation:
+  //
+  // PhysicalLine {
+  //   A physical line corresponds to a real file line (until a newline character)
+  //   it should have 0 (only a newline) or more EditorLine
+  //
+  //   EditorLine {
+  //     An editor line is a line for the editor, i.e. a line that might be the result
+  //     of wrapping or be equivalent to a physical line. EditorLine stores the characters
+  //   }
+  // }
+
+  struct EditorLine {
+    EditorLine(std::string str);
+
+    std::vector<char> m_characters;
+  };
+
+  struct PhysicalLine {
+    PhysicalLine(EditorLine editorLine) {
+      m_editorLines.emplace_back(std::move(editorLine));
+    }
+    PhysicalLine(std::vector<EditorLine>&& editorLines) {
+      m_editorLines = std::forward<std::vector<EditorLine>>(editorLines);
+    }
+    PhysicalLine(const PhysicalLine&) = default;
+    PhysicalLine() = default;
+
+    std::vector<EditorLine> m_editorLines;
+  };
+
+  enum SyntaxHighlight { NONE, CPP };
+
+  struct ThreadRequest { // A workload request for a thread
+
+    std::mutex m_syncBarrier; // Sync barrier for threads of this thread request
+
+    // Variables related to how the control renders lines
+    SkScalar m_characterWidthPixels;
+    SkScalar m_characterHeightPixels;
+    int m_wrapWidthPixels;
+    int m_maximumCharactersLine; // According to wrapWidth
+    StyleDatabase m_styleDb;
+
+    std::vector<std::string> m_plainTextLines;
+    std::vector<PhysicalLine> m_physicalLines;
+
+    size_t m_numThreads = 1;
+    size_t m_linesPerThread;
+    SkScalar m_totalBitmapHeight = 0;
+    SkScalar m_maxBitmapWidth = 0;
+    std::vector<std::promise<std::tuple<std::vector<PhysicalLine>, SkBitmap,
+      SkScalar /* effective width */, SkScalar /* effective height */>>> m_partials;
+    std::vector<std::future<std::tuple<std::vector<PhysicalLine>, SkBitmap,
+      SkScalar /* effective width */, SkScalar /* effective height */>>> m_futures;
+
+    std::function<void(size_t, std::shared_ptr<ThreadRequest>)> m_callback; // Work function
+    std::function<void(std::shared_ptr<ThreadRequest>)> m_endCallback; // End function
+  };
 
   namespace {
 
@@ -170,9 +234,9 @@ namespace varco {
 
   class ThreadPool {
   public:
-    ThreadPool(size_t N_Threads) : m_NThreads(N_Threads) {
+    ThreadPool(){
       m_workloadReady.resize(m_NThreads, false);
-      for(size_t i = 0; i < m_NThreads; ++i)
+      for (size_t i = 0; i < m_NThreads; ++i)
         m_threads.emplace_back(&ThreadPool::threadMain, this, i);
       m_threadsIdle = m_NThreads;
     }
@@ -184,31 +248,29 @@ namespace varco {
           thread.join();
       }
     }
+
     void setFinishedCV(std::condition_variable *cv) {
-      m_allWorkFinishedCV = cv;
+      m_allWorkFinishedCV.reset(cv);
     }
-    void setCallback(std::function<void(size_t)> callback) {
+    /*void setCallback(std::function<void(size_t, std::shared_ptr<ThreadRequest>)> callback) {
       m_callback = callback;
-    }
-    void dispatch() {
-	    {
-		    std::unique_lock<std::mutex> lock(m_mutex);
-		    std::fill(m_workloadReady.begin(), m_workloadReady.end(), true);
-		    m_workloadReady.resize(m_NThreads, true);
-        m_threadsIdle = 0;
-	    }
-      m_cv.notify_all();
-    }
-    bool idle() {
-      bool result = false;
+    }*/
+    /*void setEndCallback(std::function<void()> end_callback) {
+      m_end_callback = end_callback;
+    }*/
+
+    void addRequest(std::shared_ptr<ThreadRequest> request) {
       {
         std::unique_lock<std::mutex> lock(m_mutex);
-        result = (m_threadsIdle == m_NThreads);
+        m_pendingRequests.push_back(request);
+
+        // Start working
+        start();
       }
-      return result;
+      m_cv.notify_all(); // Must be done without lock
     }
 
-    const size_t m_NThreads; // Number of threads of the threadpool
+    const size_t m_NThreads = 15; // Number of threads of the threadpool
 
   private:
     void threadMain(size_t threadIdx) {
@@ -222,27 +284,61 @@ namespace varco {
         if (m_sigterm)
           return;
 
-        m_callback(threadIdx);
+        m_currentRequest->m_callback(threadIdx, m_currentRequest);
 
         {
           std::unique_lock<std::mutex> lock(m_mutex);
           m_workloadReady[threadIdx] = false;
           ++m_threadsIdle;
-          if (m_threadsIdle == m_NThreads)
-            m_allWorkFinishedCV->notify_all(); // Signal ThreadPool owner we're done
+
+          if (m_threadsIdle == m_NThreads) {
+            m_currentRequest->m_endCallback(m_currentRequest);
+            m_currentRequest.reset();
+            if (m_allWorkFinishedCV)
+              m_allWorkFinishedCV->notify_all(); // Signal ThreadPool owner we're done
+
+            // Start another workload unit (if there's any)
+            start();
+          }
         }
+        m_cv.notify_all(); // Must be done without lock
       }
     }
 
-    std::vector<std::thread> m_threads;
-    size_t m_threadsIdle;
+    // For internal use - whoever calls these must have acquired a valid lock
+
+    void start() { // Dispatch a pending request if the threadpool is idle
+      if (!idle())
+        return; // We're already doing something
+      {
+        if (m_pendingRequests.empty())
+          return;
+
+        // Grab the latest pending request and start working
+        m_currentRequest = m_pendingRequests.back();
+        m_pendingRequests.clear();
+
+        std::fill(m_workloadReady.begin(), m_workloadReady.end(), true);
+        m_threadsIdle = 0;
+      }      
+    }
+    bool idle() {
+      return (m_threadsIdle == m_NThreads);
+    }
+
+    std::vector<std::thread> m_threads;    
+    size_t m_threadsIdle = 0;
     bool m_sigterm = false;
     std::vector<bool> m_workloadReady;
     std::mutex m_mutex;
     std::condition_variable m_cv;
-    std::function<void(size_t)> m_callback;
+    std::function<void(size_t, std::shared_ptr<ThreadRequest>)> m_callback;
+    std::function<void()> m_end_callback;
     // A condition variable to signal all work has been done
-    std::condition_variable *m_allWorkFinishedCV;
+    std::shared_ptr<std::condition_variable> m_allWorkFinishedCV;
+
+    std::shared_ptr<ThreadRequest> m_currentRequest; // Working on this
+    std::vector<std::shared_ptr<ThreadRequest>> m_pendingRequests;
   };
 
 }

@@ -11,7 +11,7 @@ namespace varco {
     int id = m_tabCtrl.addNewTab("BasicBlock.cpp");
     auto it = m_tabDocumentMap.emplace(id, std::make_unique<Document>(m_codeEditCtrl));
     Document *document = it.first->second.get();
-    document->loadFromFile(TestData::SimpleFile);
+    document->loadFromFile(TestData::BasicBlockFile);
     document->applySyntaxHighlight(CPP);
     m_codeEditCtrl.loadDocument(*document);
 

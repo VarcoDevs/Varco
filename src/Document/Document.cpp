@@ -92,27 +92,28 @@ namespace varco {
 
     // If the document was already recalculated, just recalculate and apply the new syntax highlight
     if (m_firstDocumentRecalculate == false)
-      recalculateDocumentLines();
+      scheduleRender();
   }
+
 
 #define MAX_WRAPS_PER_LINE 10
 
-  void Document::threadProcessChunk(size_t threadIdx) {
+  void Document::threadProcessChunk(size_t threadIdx, std::shared_ptr<ThreadRequest> data) {
 
       // Process a chunk of data
-      if (threadIdx >= m_numThreads)
+      if (threadIdx >= data->m_numThreads)
         return;
 
       // Calculate per-thread work bounds
-      size_t start = threadIdx * m_linesPerThread;
+      size_t start = threadIdx * data->m_linesPerThread;
       size_t end;
-      if (m_numThreads == 1)
-        end = m_plainTextLines.size();
+      if (data->m_numThreads == 1)
+        end = data->m_plainTextLines.size();
       else
-        end = std::min(m_plainTextLines.size(), start + m_linesPerThread);
+        end = std::min(data->m_plainTextLines.size(), start + data->m_linesPerThread);
 
       // Precalculate the allowed number of characters per editor line
-      int maxChars = static_cast<int>(m_wrapWidthPixels / m_codeView.getCharacterWidthPixels());
+      int maxChars = static_cast<int>(data->m_wrapWidthPixels / m_codeView.getCharacterWidthPixels());
       if (maxChars < 10)
         maxChars = 10; // Keep it to a minimum
 
@@ -128,11 +129,11 @@ namespace varco {
       bitmapEffectiveHeight += startpoint.y;
 
       SkBitmap bitmap; // Allocate partial rendering result (maximum size)
-      bitmap.allocPixels(SkImageInfo::Make((int)(m_wrapWidthPixels + startpoint.x),
+      bitmap.allocPixels(SkImageInfo::Make((int)(data->m_wrapWidthPixels + startpoint.x),
         (int)((end - start) * MAX_WRAPS_PER_LINE * m_codeView.getCharacterHeightPixels() + startpoint.y),
         kN32_SkColorType, kPremul_SkAlphaType));
 
-      bitmapEffectiveWidth = m_wrapWidthPixels + startpoint.x;
+      bitmapEffectiveWidth = data->m_wrapWidthPixels + startpoint.x;
 
       SkCanvas canvas(bitmap);
       SkRect rect = SkRect::MakeIWH(bitmap.width(), bitmap.height()); // Drawing is performed on the bitmap - absolute rect      
@@ -179,17 +180,17 @@ namespace varco {
         };
       };
 
-      auto styleEnd = m_styleDb.styleSegment.end();
-      auto currentStyleIt = m_styleDb.styleSegment.begin();
+      auto styleEnd = data->m_styleDb.styleSegment.end();
+      auto currentStyleIt = data->m_styleDb.styleSegment.begin();
       bool currentlyInSegment = false;
 
       // Find first style for the first line to process (if any)
       {
-        auto previousSegmentIndex = (m_styleDb.previousSegment.size() > 0) ? m_styleDb.previousSegment[start] : -1;
+        auto previousSegmentIndex = (data->m_styleDb.previousSegment.size() > 0) ? data->m_styleDb.previousSegment[start] : -1;
         if (previousSegmentIndex == -1) {
           // There was no segment before this line, check if there's one beginning right here at character 0,
           // otherwise it means no segment was *ever* present and we switch to normal style
-          auto firstIt = m_styleDb.styleSegment.begin();
+          auto firstIt = data->m_styleDb.styleSegment.begin();
           if (firstIt != styleEnd && firstIt->line == start && firstIt->start == 0) {
             // A segment begins right at the first line (pos == 0) that we have to process, get it
             setColor(firstIt->style);
@@ -199,8 +200,8 @@ namespace varco {
             setColor(Normal);
         } else {
           // There was a previous segment, that doesn't mean its style still lasts here, we have to check
-          auto previousStyle = m_styleDb.styleSegment.begin() + previousSegmentIndex;
-          if (previousStyle->absStartPos + previousStyle->count > m_styleDb.m_absOffsetWhereLineBegins[start]) {
+          auto previousStyle = data->m_styleDb.styleSegment.begin() + previousSegmentIndex;
+          if (previousStyle->absStartPos + previousStyle->count > data->m_styleDb.m_absOffsetWhereLineBegins[start]) {
             // Yes, it still lasts
             currentStyleIt = previousStyle;
             currentlyInSegment = true;
@@ -211,16 +212,16 @@ namespace varco {
       }
 
       auto getFirstSegmentOnLine = [&](size_t line) {
-        auto res = m_styleDb.firstSegmentOnLine.find(line);
-        if (res == m_styleDb.firstSegmentOnLine.end())
+        auto res = data->m_styleDb.firstSegmentOnLine.find(line);
+        if (res == data->m_styleDb.firstSegmentOnLine.end())
           return styleEnd;
         else
-          return m_styleDb.styleSegment.begin() + res->second;
+          return data->m_styleDb.styleSegment.begin() + res->second;
       };
 
       auto renderEditorLine = [&](EditorLine& el, size_t currentPhysicalLine, size_t physicalLineOffset)
       {
-        startpoint.y += m_characterHeightPixels;  // Do the carriage return here, reason: drawText works with
+        startpoint.y += data->m_characterHeightPixels;  // Do the carriage return here, reason: drawText works with
                                                   // the left-BOTTOM corner of a cell
         bitmapEffectiveHeight = startpoint.y;
 
@@ -230,15 +231,15 @@ namespace varco {
           return;
 
         {
-          std::unique_lock<std::mutex> syncBarrier;
-          if (editorLineSize > m_maximumCharactersLine) // Check if this is the longest line found ever
-            m_maximumCharactersLine = (int)editorLineSize;
+          std::unique_lock<std::mutex> lock(data->m_syncBarrier);
+          if (editorLineSize > data->m_maximumCharactersLine) // Check if this is the longest line found ever
+            data->m_maximumCharactersLine = (int)editorLineSize;
         }
 
         startpoint.x = BITMAP_OFFSET_X; // Reset the offset        
 
         size_t charsRendered = 0;
-        size_t absPosition = m_styleDb.m_absOffsetWhereLineBegins[currentPhysicalLine] + physicalLineOffset;
+        size_t absPosition = data->m_styleDb.m_absOffsetWhereLineBegins[currentPhysicalLine] + physicalLineOffset;
 
         do {
 
@@ -314,7 +315,7 @@ namespace varco {
 
           canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y - fontDescent, painter); // Notice the fontDescent!
           charsRendered += ts.size();
-          startpoint.x += m_characterWidthPixels * ts.size();
+          startpoint.x += data->m_characterWidthPixels * ts.size();
 
           //
           // Update the state before continuing
@@ -332,7 +333,7 @@ namespace varco {
       std::string line;
       for (size_t i = start; i < end; ++i) {
 
-        line = m_plainTextLines[i];
+        line = data->m_plainTextLines[i];
 
         std::string restOfLine;
         std::vector<EditorLine> edLines;
@@ -399,10 +400,10 @@ namespace varco {
 
       // Time to fulfill the promise
       {
-        std::unique_lock<std::mutex> lock(syncBarrier);
-        m_totalBitmapHeight += bitmapEffectiveHeight;
-        m_maxBitmapWidth = std::max(m_maxBitmapWidth, bitmapEffectiveWidth);
-        m_partials[threadIdx].set_value(
+        std::unique_lock<std::mutex> lock(data->m_syncBarrier);
+        data->m_totalBitmapHeight += bitmapEffectiveHeight;
+        data->m_maxBitmapWidth = std::max(data->m_maxBitmapWidth, bitmapEffectiveWidth);
+        data->m_partials[threadIdx].set_value(
           std::make_tuple<std::vector<PhysicalLine>, SkBitmap, SkScalar, SkScalar>(
             std::move(phLineVec), std::move(bitmap), std::move(bitmapEffectiveWidth), std::move(bitmapEffectiveHeight))
         );
@@ -410,7 +411,7 @@ namespace varco {
   }
 
 
-  void Document::recalculateDocumentLines() {
+  void Document::scheduleRender() {
 
     if (!m_codeView.isControlReady())
       return; // A document can be loaded at any time
@@ -420,30 +421,40 @@ namespace varco {
 
     m_firstDocumentRecalculate = false;
 
+    // Generate a workload request for the threadpool
+    std::shared_ptr<ThreadRequest> request = std::make_shared<ThreadRequest>();
+
+    {
+      std::unique_lock<std::mutex> lock(m_documentMutex);
+      request->m_plainTextLines = m_plainTextLines;
+      request->m_physicalLines = m_physicalLines;
+    }
+
     if (m_needReLexing) {
       std::string m_plainText;
-      for (auto& line : m_plainTextLines) { // Expensive, hopefully this doesn't happen too often - LEX DIRECTLY FROM VECTOR
+      for (auto& line : request->m_plainTextLines) { // Expensive, hopefully this doesn't happen too often - LEX DIRECTLY FROM VECTOR
         m_plainText.append(line);
         m_plainText += '\n';
       }
-      m_lexer->lexInput(std::move(m_plainText), m_styleDb);
+      m_lexer->lexInput(std::move(m_plainText), this->m_latestStyleDb);
       m_needReLexing = false;
     }
 
-    // Load parameters from codeview parent
-    m_characterWidthPixels = m_codeView.getCharacterWidthPixels();
-    m_characterHeightPixels = m_codeView.getCharacterHeightPixels();
-
+    // Load parameters from codeview parent and this window
+    request->m_characterWidthPixels = m_codeView.getCharacterWidthPixels();
+    request->m_characterHeightPixels = m_codeView.getCharacterHeightPixels();
+    request->m_wrapWidthPixels = this->m_wrapWidthPixels;
+    request->m_styleDb = this->m_latestStyleDb;
 
     // Subdivide the document's lines into a suitable amount of workload per thread
     size_t numThreads = m_codeView.m_threadPool.m_NThreads;
     size_t minLinesPerThread = 20u;
 
     while (true) {
-      m_linesPerThread = static_cast<size_t>(
+      request->m_linesPerThread = static_cast<size_t>(
         std::ceil(m_plainTextLines.size() / static_cast<float>(numThreads))
         );
-      if (m_linesPerThread < minLinesPerThread) {
+      if (request->m_linesPerThread < minLinesPerThread) {
         numThreads /= 2;
         if (numThreads < 1)
           numThreads = 1;
@@ -453,96 +464,27 @@ namespace varco {
       break;
     }
 
-    {
-      std::unique_lock<std::mutex> lock(syncBarrier);
-      m_numThreads = numThreads;
-      m_partials.clear();
-      m_futures.clear();
-      m_partials.resize(numThreads);
-      m_futures.reserve(numThreads);
-      for (size_t i = 0; i < numThreads; ++i)
-        m_futures.emplace_back(m_partials[i].get_future());
-    }
-    
-    m_totalBitmapHeight = 0;
-    m_maxBitmapWidth = 0;
-    m_maximumCharactersLine = 0;
+    // Set up threadpool for this document
+    request->m_numThreads = numThreads;
+    request->m_partials.clear();
+    request->m_futures.clear();
+    request->m_partials.resize(numThreads);
+    request->m_futures.reserve(numThreads);
+    for (size_t i = 0; i < numThreads; ++i)
+      request->m_futures.emplace_back(request->m_partials[i].get_future());
 
-    // Set threads callback (the work function) and the condition variable to wake us up when the rendering is done
-    m_codeView.m_threadPool.setCallback(std::bind(&Document::threadProcessChunk, this, std::placeholders::_1));
-    std::mutex waitWorkMutex;
-    std::condition_variable allWorkFinishedCV;
-    m_codeView.m_threadPool.setFinishedCV(&allWorkFinishedCV);
+    request->m_totalBitmapHeight = 0;
+    request->m_maxBitmapWidth = 0;
+    request->m_maximumCharactersLine = 0;
 
-    m_codeView.m_threadPool.dispatch();
+    // Threads callback (work and end functions)
+    request->m_callback = std::bind(&Document::threadProcessChunk, this, std::placeholders::_1, std::placeholders::_2);
+    request->m_endCallback = std::bind(&Document::collectResult, this, std::placeholders::_1);
 
-    // Wait for the threadpool to finish
-    {
-      std::unique_lock<std::mutex> lock(waitWorkMutex);
-      while (m_codeView.m_threadPool.idle() == false) { // Safeguard against spurious wakeups
-        allWorkFinishedCV.wait(lock);
-      }
-    }
-    
-    // All threads have signalled their 'idle' status, but futures might not have been set yet
-    {
-      std::unique_lock<std::mutex> lock(syncBarrier);
-      for (auto& el : m_futures) { // Wait for futures collection (must all become valid)
-        el.wait();
-      }
-    }
 
-    // Resize the document bitmap to fit the new render that will take place
+    m_codeView.m_threadPool.addRequest(request);
 
-    SkRect bitmapRect;
-    {
-      std::unique_lock<std::mutex> lock(syncBarrier);
-      bitmapRect = SkRect::MakeLTRB(0, 0, m_maxBitmapWidth, m_totalBitmapHeight);
-      this->resize(bitmapRect);
-    }
-
-    m_physicalLines.clear();
-    
-
-    SkCanvas canvas(this->m_bitmap);
-
-    // Draw background for the entire document
-    {
-      SkPaint background;
-      background.setColor(SkColorSetARGB(255, 39, 40, 34));
-      canvas.drawRect(bitmapRect, background);
-    }
-    
-    
-    SkScalar yOffset = 0;
-    m_numberOfEditorLines = 0;
-    for (auto& fut : m_futures) {
-
-      auto data = std::move(fut.get());
-      std::vector<PhysicalLine>& physLines = std::get<0>(data);
-      SkBitmap& partialBmp = std::get<1>(data);
-      SkScalar& partialBmpWidth = std::get<2>(data);
-      SkScalar& partialBmpHeight = std::get<3>(data);
-
-      SkBitmap partialBitmap = std::move(partialBmp);
-
-      m_numberOfEditorLines += (int)physLines.size();
-      
-      moveAppendVector<PhysicalLine>(m_physicalLines, physLines);
-      
-      // Calculate source and destination rect
-      SkRect partialRect = SkRect::MakeLTRB(0, 0, partialBmpWidth, partialBmpHeight);
-      SkRect documentDestRect = SkRect::MakeLTRB(0, yOffset, partialBmpWidth, (yOffset + partialBmpHeight));
-
-      canvas.drawBitmapRect(partialBitmap, partialRect, documentDestRect, nullptr,
-                            SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
-      yOffset += partialBmpHeight;
-    }
-
- 
-
-    m_dirty = false;
-
+//    m_codeView.m_threadPool.dispatch(); // Calculate
 
    
 
@@ -660,12 +602,105 @@ namespace varco {
     //		//cout << "Done in " << sec << " seconds / " << msec << " milliseconds";
   }
 
+  void Document::collectResult(std::shared_ptr<ThreadRequest> request) {
+
+    //std::mutex waitWorkMutex;
+    //std::condition_variable allWorkFinishedCV;
+    //m_codeView.m_threadPool.setFinishedCV(&allWorkFinishedCV);
+
+    //// Wait for the threadpool to finish
+    //{
+    //  std::unique_lock<std::mutex> lock(waitWorkMutex);
+    //  while (m_codeView.m_threadPool.idle() == false) { // Safeguard against spurious wakeups
+    //    allWorkFinishedCV.wait(lock);
+    //  }
+    //}
+
+    // All threads have signalled their 'idle' status, but futures might not have been set yet
+
+    std::unique_lock<std::mutex> lock(request->m_syncBarrier);
+    for (auto& el : request->m_futures) { // Wait for futures collection (must all become valid)
+      el.wait();
+    }
+   
+
+    // Resize the document bitmap to fit the new render that will take place
+    SkRect bitmapRect;
+    bitmapRect = SkRect::MakeLTRB(0, 0, request->m_maxBitmapWidth, request->m_totalBitmapHeight);
+
+    {
+      std::unique_lock<std::mutex> lock(m_documentMutex);
+      
+      // Update the document with the request values
+      this->m_characterWidthPixels = request->m_characterWidthPixels;
+      this->m_characterHeightPixels = request->m_characterHeightPixels;
+      this->m_maximumCharactersLine = request->m_maximumCharactersLine;
+    
+      // This adjustment is necessary since the control needs not to know anything about its
+      // relative position on its parent. It always starts drawing its bitmap at top-left 0;0
+      //this->m_offscreenBuffer.allocPixels(SkImageInfo::Make((int)(bitmapRect.fRight - bitmapRect.fLeft),
+
+      this->resize(bitmapRect);
+
+      SkCanvas canvas(this->m_bitmap);
+
+      m_physicalLines.clear();
+
+
+    
+
+      // Draw background for the entire document
+      {
+        SkPaint background;
+        background.setColor(SkColorSetARGB(255, 39, 40, 34));
+        canvas.drawRect(bitmapRect, background);
+      }
+
+
+      SkScalar yOffset = 0;
+      m_numberOfEditorLines = 0;
+      for (auto& fut : request->m_futures) {
+
+        auto data = std::move(fut.get());
+        std::vector<PhysicalLine>& physLines = std::get<0>(data);
+        SkBitmap& partialBmp = std::get<1>(data);
+        SkScalar& partialBmpWidth = std::get<2>(data);
+        SkScalar& partialBmpHeight = std::get<3>(data);
+
+        SkBitmap partialBitmap = std::move(partialBmp);
+
+        m_numberOfEditorLines += (int)physLines.size();
+
+        moveAppendVector<PhysicalLine>(m_physicalLines, physLines);
+
+        // Calculate source and destination rect
+        SkRect partialRect = SkRect::MakeLTRB(0, 0, partialBmpWidth, partialBmpHeight);
+        SkRect documentDestRect = SkRect::MakeLTRB(0, yOffset, partialBmpWidth, (yOffset + partialBmpHeight));
+
+        canvas.drawBitmapRect(partialBitmap, partialRect, documentDestRect, nullptr,
+          SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
+        yOffset += partialBmpHeight;
+      }
+    }
+
+    m_offscreenReady = true;
+  }
+
   void Document::paint() {
     if (!m_dirty)
       return;
 
+    scheduleRender();
 
-    recalculateDocumentLines();
+    /*if (m_offscreenReady) {
+      {
+        std::unique_lock<std::mutex> lock(m_offscreenMutex);
+        this->m_bitmap = m_offscreenBuffer;
+      }
+      m_offscreenReady = false;
+    }*/
+
+    m_dirty = false;
 
     //m_dirty = false; // It will be false at the end of this function, unless overridden
 

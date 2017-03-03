@@ -11,7 +11,7 @@ namespace varco {
 #define VSCROLLBAR_WIDTH 15
 
   CodeView::CodeView(UIElement<ui_container_tag>& parentContainer)
-    : UIElement(parentContainer), m_threadPool(15)
+    : UIElement(parentContainer)
   {
     // Create a monospace typeface
     // An alternative approach here is to ship a standard font for every/each platform
@@ -102,7 +102,7 @@ namespace varco {
     if (m_document != nullptr && m_wrapWidthInPixels != m_document->m_wrapWidthPixels) {
       
       m_document->setWrapWidthInPixels(m_wrapWidthInPixels);
-      m_document->recalculateDocumentLines();
+      m_document->scheduleRender();
 
       // Resize the document bitmap to fit the new render that will take place
       //SkRect newRect = SkRect::MakeLTRB(0, 0, m_wrapWidthInPixels * getCharacterWidthPixels() + 5.f,
@@ -255,8 +255,11 @@ namespace varco {
     SkRect bitmapPartialRect = SkRect::MakeLTRB(0, documentYoffset, this->getRect(absoluteRect).width(), documentYoffset + this->getRect(absoluteRect).height());
     SkRect myDestRect = SkRect::MakeLTRB(0, 0, this->getRect(absoluteRect).width(), this->getRect(absoluteRect).height());
 
-    canvas.drawBitmapRect(m_document->getBitmap(), bitmapPartialRect, myDestRect, nullptr,
-                          SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
+    {
+      std::unique_lock<std::mutex> lock(m_document->m_documentMutex); // A document's bitmap might be still in rendering by the threadpool
+      canvas.drawBitmapRect(m_document->getBitmap(), bitmapPartialRect, myDestRect, nullptr,
+                            SkCanvas::SrcRectConstraint::kFast_SrcRectConstraint);
+    }
 
     //////////////////////////////////////////////////////////////////////
     // Draw the cursor if in sight
