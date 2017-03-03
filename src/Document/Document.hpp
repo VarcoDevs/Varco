@@ -55,9 +55,6 @@ namespace varco {
     } m_cursorPos; // Latest known cursor position
     
     void threadProcessChunk(size_t threadIdx, std::shared_ptr<ThreadRequest> data);
-    std::mutex m_offscreenMutex;
-    SkBitmap m_offscreenBuffer;
-    bool m_offscreenReady = false;
   };
 
 }

@@ -310,8 +310,8 @@ namespace varco {
           //
           std::string ts(el.m_characters.data() + charsRendered, nextPosToReach - charsRendered);
 
-          if (ts.find("FACK") != std::string::npos)
-            printf("lol");
+          //if (ts.find("breakpoint") != std::string::npos)
+          //  printf("breakpoint");
 
           canvas.drawText(ts.data(), ts.size(), startpoint.x, startpoint.y - fontDescent, painter); // Notice the fontDescent!
           charsRendered += ts.size();
@@ -646,9 +646,6 @@ namespace varco {
 
       m_physicalLines.clear();
 
-
-    
-
       // Draw background for the entire document
       {
         SkPaint background;
@@ -682,8 +679,6 @@ namespace varco {
         yOffset += partialBmpHeight;
       }
     }
-
-    m_offscreenReady = true;
   }
 
   void Document::paint() {
